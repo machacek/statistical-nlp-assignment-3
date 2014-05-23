@@ -17,6 +17,10 @@ test.tagged: lexicon test.corpus test.bigrams lexical.rules contextual.rules
 		> $@
 
 
+%.lexicon: %.T.ptg:
+	cat $< \
+		| ./create-lexicon \
+		> $@
 
 %.1.S.ptg: text%2.ptg
 	cat $< \
