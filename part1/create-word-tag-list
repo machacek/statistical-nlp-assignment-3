@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+import sys
+import argparse
+import itertools
+import collections
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Lists of all (words tag count) occurring in FILE_TAGGED, sorted by decreasing frequency.", 
+        epilog="Author: Matous Machacek <machacekmatous@gmail.com>")
+    
+    parser.add_argument("input",
+            help="A file with one sentence per line, omit or '-' for stdin",
+            metavar="FILE_TAGGED",
+            nargs='?',
+            default=sys.stdin,
+            type=argparse.FileType('r'),
+            )
+
+    return parser.parse_args()
+args = parse_args()
+
+def main():
+    counter = collections.Counter()
+    for line in args.input:
+        counter.update(line.split())
+    for item, count in counter.most_common():
+        word, tag = item.split('/',2)
+        print(word, tag, count)
+
+if __name__ == '__main__':
+    main()

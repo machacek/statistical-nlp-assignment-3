@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+import sys
+import argparse
+import itertools
+import collections
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Removes tags.", 
+        epilog="Author: Matous Machacek <machacekmatous@gmail.com>")
+    
+    parser.add_argument("input",
+            help="A file with one sentence per line, omit or '-' for stdin",
+            metavar="FILE_SPL",
+            nargs='?',
+            default=sys.stdin,
+            type=argparse.FileType('r'),
+            )
+
+    return parser.parse_args()
+args = parse_args()
+
+def main():
+    for line in args.input:
+        words = [item.split('/',2)[0] for item in line.split()]
+        print(*words)
+
+if __name__ == '__main__':
+    main()
