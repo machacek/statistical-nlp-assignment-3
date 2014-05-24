@@ -12,6 +12,7 @@ def parse_args():
     parser.add_argument("input",
             help="A file in ptg format, omit or '-' for stdin",
             metavar="FILE_PTG",
+            nargs='?',
             default=sys.stdin,
             type=argparse.FileType('r'),
             )

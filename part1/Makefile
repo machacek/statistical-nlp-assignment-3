@@ -4,11 +4,11 @@ BRILL_TAGGER = $(shell first_existing /home/mmachace/RULE_BASED_TAGGER_V1.14/Bin
 
 .PHONY: all clean
 
-all: cz.1.S.spl cz.1.T.spl cz.1.H.spl
+all: cz.1.T.lexicon
 
 
-test.tagged: lexicon test.corpus test.bigrams lexical.rules contextual.rules
-	$(BRILL_TAGGER) \
+#test.tagged: lexicon test.corpus test.bigrams lexical.rules contextual.rules
+#	$(BRILL_TAGGER) \
 		lexicon \
 		test.corpus \
 		test.bigrams \
@@ -17,7 +17,7 @@ test.tagged: lexicon test.corpus test.bigrams lexical.rules contextual.rules
 		> $@
 
 
-%.lexicon: %.T.ptg:
+%.lexicon: %.ptg
 	cat $< \
 		| ./create-lexicon \
 		> $@
@@ -47,4 +47,4 @@ test.tagged: lexicon test.corpus test.bigrams lexical.rules contextual.rules
 
 
 clean:
-	rm -rf cz.*.ptg en.*.ptg *.spl
+	rm -rf cz.*.ptg en.*.ptg *.spl *.lexicon
