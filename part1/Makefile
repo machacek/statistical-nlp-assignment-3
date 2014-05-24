@@ -17,8 +17,18 @@ all: cz.1.T.lexicon cz.1.S.untagged
 		contextual.rules \
 		> $@
 
+%.unknown-rules: %.big-word-list %.word-tag-list %.bigrams
+	perl $(BRILL_DIR)/Learner_Code/unknown-lexical-learn.prl \
+		$^ 300 $@
+
 %.word-tag-list: %.for-unknown.spl
 	cat $^ | ./create-word-tag-list >$@
+
+%.bigrams: %.T.untagged %.S.untagged %.H.untagged
+	cat $^ \
+		| perl $(BRILL_DIR)/Utilities/bigram-generate.prl \
+		| cut "-d " -f1,2 \
+		> $@
 
 %.big-word-list: %.T.untagged %.S.untagged %.H.untagged
 	cat $^ | ./create-word-list >$@
@@ -56,4 +66,14 @@ all: cz.1.T.lexicon cz.1.S.untagged
 
 
 clean:
-	rm -rf cz.*.ptg en.*.ptg *.spl *.lexicon *.untagged *.big-word-list *.word-tag-list *.big-word-list
+	rm -rf \
+		cz.*.ptg \
+		en.*.ptg \
+		*.spl \
+		*.lexicon \
+		*.untagged \
+		*.big-word-list \
+		*.word-tag-list \
+		*.big-word-list \
+		*.bigrams \
+		*.unknown-rules
