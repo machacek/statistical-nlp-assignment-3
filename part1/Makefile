@@ -5,50 +5,78 @@ BRILL_TAGGER = $(BRILL_DIR)/Bin_and_Data/tagger
 
 .PHONY: all clean
 
-all: cz.1.T.lexicon cz.1.S.untagged
+.SECONDARY:
 
+all: cz.fold1.S.tagged
 
-#test.tagged: lexicon test.corpus test.bigrams lexical.rules contextual.rules
-#	$(BRILL_TAGGER) \
-		lexicon \
-		test.corpus \
-		test.bigrams \
-		lexical.rules \
-		contextual.rules \
-		> $@
+#
+# Evaluace
+#
+# %.S.accuracy: %.S.tagged %.S.spl
+
+#
+# Tagovani testovaci sady
+#
+%.S.tagged: %.T.lexicon %.S.untagged %.bigram-list %.unknown-word-rules %.context-rules
+	$(BRILL_TAGGER) $^ > $@
+
+#
+# Trenovani kontextualnich pravidel
+#
+%.context-rules: %.T.part2.spl %.T.part2.dummy-tagged %.T.part1.lexicon
+	$(BRILL_DIR)/Bin_and_Data/contextual-rule-learn \
+		$*.T.part2.spl \
+		$*.T.part2.dummy-tagged \
+		$@ \
+		$*.T.part1.lexicon
+
+%.T.part2.dummy-tagged: %.T.part1.lexicon %.T.part2.untagged %.bigram-list %.unknown-word-rules %.word-list
+	dir=$$PWD; cd $(BRILL_DIR)/Bin_and_Data; \
+	tagger \
+		$$dir/$*.T.part1.lexicon \
+		$$dir/$*.T.part2.untagged \
+		$$dir/$*.bigram-list \
+		$$dir/$*.unknown-word-rules \
+		/dev/null \
+		-w $$dir/$*.word-list -S \
+		> $$dir/$@ ; \
+	cd $$dir
+
 
 #
 # Trenovani pravidel pro neznama slova
 #
-%.unknown-rules: %.big-word-list %.word-tag-list %.bigrams
+%.unknown-word-rules: %.word-list %.T.part1.word-tag-list %.bigram-list
 	perl $(BRILL_DIR)/Learner_Code/unknown-lexical-learn.prl \
-		$^ 300 $@
+		$^ 100 $@
 
 #
 # Vytvoreni pomocnych souboru pro trenovani pravidel pro neznama slova
 # (k seznamu slov a bigramu pouzivame vsechna neanotovana data)
 #
-%.word-tag-list: %.for-unknown.spl
-	cat $^ | ./create-word-tag-list >$@
-
-%.bigrams: %.T.untagged %.S.untagged %.H.untagged
+%.bigram-list: %.T.untagged %.S.untagged %.H.untagged
 	cat $^ \
 		| perl $(BRILL_DIR)/Utilities/bigram-generate.prl \
 		| cut "-d " -f1,2 \
 		> $@
 
-%.big-word-list: %.T.untagged %.S.untagged %.H.untagged
+%.word-list: %.T.untagged %.S.untagged %.H.untagged
 	cat $^ | ./create-word-list >$@
 
 #
 # Rozdeleni trenovaci mnoziny (T) na dve trenovaci mnoziny
-# (Pozdeji prejmenovat)
 #
-%.for-unknown.spl: %.T.spl
+%.T.part1.spl: %.T.spl
 	cat $< | awk 'NR % 2 == 0' > $@
 
-%.for-contextual.spl: %.T.spl
+%.T.part2.spl: %.T.spl
 	cat $< | awk 'NR % 2 == 1' > $@
+
+#
+# Genericke pravidlo pro vytvoreni seznamu nejcastejsich dvojic word/tag
+#
+%.word-tag-list: %.spl
+	cat $^ | ./create-word-tag-list > $@
 
 #
 # Genericke pravidlo pro odstraneni tagu z formatu jedna veta na radek
@@ -63,15 +91,15 @@ all: cz.1.T.lexicon cz.1.S.untagged
 	cat $< | ./create-lexicon > $@
 
 #
-# Zde jsou definovana rozdeleni na mnoziny S T H pro jednotlive behy
+# Zde jsou definovana rozdeleni na mnoziny S T H pro jednotlive foldy
 #
-%.1.S.ptg: text%2.ptg
+%.fold1.S.ptg: text%2.ptg
 	cat $< | tail -n 40000 > $@
 
-%.1.T.ptg: text%2.ptg
-	cat $< | head -n -60000 > $@
+%.fold1.T.ptg: text%2.ptg
+	cat $< | head -n -60000 | head 10000 > $@
 
-%.1.H.ptg: text%2.ptg
+%.fold1.H.ptg: text%2.ptg
 	cat $< \
 		| tail -n 60000 \
 		| head -n 20000 \
@@ -99,6 +127,7 @@ clean:
 		*.untagged \
 		*.big-word-list \
 		*.word-tag-list \
-		*.big-word-list \
-		*.bigrams \
-		*.unknown-rules
+		*.word-list \
+		*.bigram-list \
+		*.unknown-word-rules \
+		*.context-rules
