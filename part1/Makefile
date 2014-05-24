@@ -17,10 +17,17 @@ all: cz.1.T.lexicon cz.1.S.untagged
 		contextual.rules \
 		> $@
 
+#
+# Trenovani pravidel pro neznama slova
+#
 %.unknown-rules: %.big-word-list %.word-tag-list %.bigrams
 	perl $(BRILL_DIR)/Learner_Code/unknown-lexical-learn.prl \
 		$^ 300 $@
 
+#
+# Vytvoreni pomocnych souboru pro trenovani pravidel pro neznama slova
+# (k seznamu slov a bigramu pouzivame vsechna neanotovana data)
+#
 %.word-tag-list: %.for-unknown.spl
 	cat $^ | ./create-word-tag-list >$@
 
@@ -33,18 +40,31 @@ all: cz.1.T.lexicon cz.1.S.untagged
 %.big-word-list: %.T.untagged %.S.untagged %.H.untagged
 	cat $^ | ./create-word-list >$@
 
+#
+# Rozdeleni trenovaci mnoziny (T) na dve trenovaci mnoziny
+# (Pozdeji prejmenovat)
+#
 %.for-unknown.spl: %.T.spl
 	cat $< | awk 'NR % 2 == 0' > $@
 
 %.for-contextual.spl: %.T.spl
 	cat $< | awk 'NR % 2 == 1' > $@
 
+#
+# Genericke pravidlo pro odstraneni tagu z formatu jedna veta na radek
+#
 %.untagged: %.spl
 	cat $< | ./remove-tags > $@
 
-%.lexicon: %.ptg
+#
+# Genericke pravidlo pro vytvoreni lexiconu
+#
+%.lexicon: %.spl
 	cat $< | ./create-lexicon > $@
 
+#
+# Zde jsou definovana rozdeleni na mnoziny S T H pro jednotlive behy
+#
 %.1.S.ptg: text%2.ptg
 	cat $< | tail -n 40000 > $@
 
@@ -57,6 +77,9 @@ all: cz.1.T.lexicon cz.1.S.untagged
 		| head -n 20000 \
 		> $@
 
+#
+# Genericke pravidlo pro prevod do formatu jedna veta na radek
+#
 %.spl: %.ptg
 	cat $< \
 		| tr "\n" " " \
@@ -64,7 +87,9 @@ all: cz.1.T.lexicon cz.1.S.untagged
 		| grep -v "^$$" \
 		> $@
 
-
+#
+# Smazani nepotrebnych souboru
+#
 clean:
 	rm -rf \
 		cz.*.ptg \

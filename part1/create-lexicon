@@ -21,11 +21,15 @@ def parse_args():
 args = parse_args()
 
 def main():
-    sorted_lines = sorted(line.strip().split('/',2) for line in args.input)
-    for word, group in itertools.groupby(sorted_lines, key=lambda x: x[0]):
-        tags = collections.Counter(tag for word, tag in group)
-        sorted_by_count = [tag for tag, count in tags.most_common()]
-        print(word, *sorted_by_count)
+    tag_counters = collections.defaultdict(collections.Counter)
+    for line in args.input:
+        for item in line.split():
+            word, tag = item.split('/',2) 
+            tag_counters[word][tag] += 1
+    
+    for word, tag_counter in tag_counters.items():
+        tags_by_count = [tag for tag, count in tag_counter.most_common()]
+        print(word, *tags_by_count)
 
 if __name__ == '__main__':
     main()
