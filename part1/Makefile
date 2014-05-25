@@ -16,7 +16,7 @@ all: cz.fold1.S.tagged
 
 #
 # Tagovani testovaci sady
-#
+
 %.S.tagged: %.T.lexicon %.S.untagged %.bigram-list %.unknown-word-rules %.context-rules
 	$(BRILL_TAGGER) $^ > $@
 
@@ -31,24 +31,24 @@ all: cz.fold1.S.tagged
 		$*.T.part1.lexicon
 
 %.T.part2.dummy-tagged: %.T.part1.lexicon %.T.part2.untagged %.bigram-list %.unknown-word-rules %.word-list
-	dir=$$PWD; cd $(BRILL_DIR)/Bin_and_Data; \
+	export PATH=$(BRILL_DIR)/Bin_and_Data:$$PATH && \
 	tagger \
-		$$dir/$*.T.part1.lexicon \
-		$$dir/$*.T.part2.untagged \
-		$$dir/$*.bigram-list \
-		$$dir/$*.unknown-word-rules \
+		$*.T.part1.lexicon \
+		$*.T.part2.untagged \
+		$*.bigram-list \
+		$*.unknown-word-rules \
 		/dev/null \
-		-w $$dir/$*.word-list -S \
-		> $$dir/$@ ; \
-	cd $$dir
+		-w $*.word-list -S \
+		> $@
 
 
 #
 # Trenovani pravidel pro neznama slova
 #
 %.unknown-word-rules: %.word-list %.T.part1.word-tag-list %.bigram-list
-	perl $(BRILL_DIR)/Learner_Code/unknown-lexical-learn.prl \
-		$^ 100 $@
+	cp unk $@
+	#perl $(BRILL_DIR)/Learner_Code/unknown-lexical-learn.prl \
+	#		$^ 300 $@
 
 #
 # Vytvoreni pomocnych souboru pro trenovani pravidel pro neznama slova
@@ -97,7 +97,7 @@ all: cz.fold1.S.tagged
 	cat $< | tail -n 40000 > $@
 
 %.fold1.T.ptg: text%2.ptg
-	cat $< | head -n -60000 | head 10000 > $@
+	cat $< | head -n -60000  > $@
 
 %.fold1.H.ptg: text%2.ptg
 	cat $< \
@@ -130,4 +130,5 @@ clean:
 		*.word-list \
 		*.bigram-list \
 		*.unknown-word-rules \
-		*.context-rules
+		*.context-rules \
+		*.dummy-tagged
