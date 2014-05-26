@@ -7,17 +7,19 @@ BRILL_TAGGER = $(BRILL_DIR)/Bin_and_Data/tagger
 
 .SECONDARY:
 
-all: cz.fold1.S.tagged
+all: cz.fold1.S.accuracy
 
 #
 # Evaluace
 #
-# %.S.accuracy: %.S.tagged %.S.spl
+%.accuracy: %.tagged %.spl
+	./measure-accuracy $^ > $@
 
 #
 # Tagovani testovaci sady
-
+#
 %.S.tagged: %.T.lexicon %.S.untagged %.bigram-list %.unknown-word-rules %.context-rules
+	export PATH=$(BRILL_DIR)/Bin_and_Data:$$PATH && \
 	$(BRILL_TAGGER) $^ > $@
 
 #
@@ -28,7 +30,8 @@ all: cz.fold1.S.tagged
 		$*.T.part2.spl \
 		$*.T.part2.dummy-tagged \
 		$@ \
-		$*.T.part1.lexicon
+		$*.T.part1.lexicon ; \
+	[ $$? -eq 224 ] # XXX The learner returns exit code 224
 
 %.T.part2.dummy-tagged: %.T.part1.lexicon %.T.part2.untagged %.bigram-list %.unknown-word-rules %.word-list
 	export PATH=$(BRILL_DIR)/Bin_and_Data:$$PATH && \
@@ -46,9 +49,9 @@ all: cz.fold1.S.tagged
 # Trenovani pravidel pro neznama slova
 #
 %.unknown-word-rules: %.word-list %.T.part1.word-tag-list %.bigram-list
-	cp unk $@
-	#perl $(BRILL_DIR)/Learner_Code/unknown-lexical-learn.prl \
-	#		$^ 300 $@
+	# cp unk $@
+	perl $(BRILL_DIR)/Learner_Code/unknown-lexical-learn.prl \
+			$^ 300 $@
 
 #
 # Vytvoreni pomocnych souboru pro trenovani pravidel pro neznama slova
@@ -97,7 +100,7 @@ all: cz.fold1.S.tagged
 	cat $< | tail -n 40000 > $@
 
 %.fold1.T.ptg: text%2.ptg
-	cat $< | head -n -60000  > $@
+	cat $< | head -n -60000 | head -n10000  > $@
 
 %.fold1.H.ptg: text%2.ptg
 	cat $< \
@@ -131,4 +134,5 @@ clean:
 		*.bigram-list \
 		*.unknown-word-rules \
 		*.context-rules \
-		*.dummy-tagged
+		*.dummy-tagged \
+		*.tagged
