@@ -3,11 +3,13 @@ SHELL = /bin/bash
 BRILL_DIR = $(shell first_existing /home/mmachace/RULE_BASED_TAGGER_V1.14)
 BRILL_TAGGER = $(BRILL_DIR)/Bin_and_Data/tagger
 
+TRAIN_SIZE = 10000
+
 .PHONY: all clean
 
 .SECONDARY:
 
-all: cz.fold1.S.accuracy
+all: en.fold1.S.accuracy en.fold2.S.accuracy en.fold3.S.accuracy en.fold4.S.accuracy en.fold5.S.accuracy cz.fold1.S.accuracy cz.fold2.S.accuracy cz.fold3.S.accuracy cz.fold4.S.accuracy cz.fold5.S.accuracy
 
 #
 # Evaluace
@@ -43,7 +45,6 @@ all: cz.fold1.S.accuracy
 		/dev/null \
 		-w $*.word-list -S \
 		> $@
-
 
 #
 # Trenovani pravidel pro neznama slova
@@ -96,16 +97,91 @@ all: cz.fold1.S.accuracy
 #
 # Zde jsou definovana rozdeleni na mnoziny S T H pro jednotlive foldy
 #
+
+# Fold 1
 %.fold1.S.ptg: text%2.ptg
 	cat $< | tail -n 40000 > $@
 
 %.fold1.T.ptg: text%2.ptg
-	cat $< | head -n -60000 | head -n10000  > $@
+	cat $< \
+		| head -n -60000 \
+		| head -n$(TRAIN_SIZE) \
+		> $@
 
 %.fold1.H.ptg: text%2.ptg
 	cat $< \
 		| tail -n 60000 \
 		| head -n 20000 \
+		> $@
+
+# Fold 2
+%.fold2.S.ptg: text%2.ptg
+	cat $< | head -n 40000 > $@
+
+%.fold2.T.ptg: text%2.ptg
+	cat $< \
+		| tail -n +60001 \
+		| head -n$(TRAIN_SIZE)  \
+		> $@
+
+%.fold2.H.ptg: text%2.ptg
+	cat $< \
+		| head -n 60000 \
+		| tail -n 20000 \
+		> $@
+
+# Fold 3
+%.fold3.S.ptg: text%2.ptg
+	cat $< \
+		| tail -n +60001 \
+		| head -n 40000 > $@
+
+%.fold3.T.ptg: text%2.ptg
+	cat $< | head -n 60000 > $@
+	cat $< | tail -n +120001 >> $@
+	cat $@ | head -n$(TRAIN_SIZE) | sponge $@
+
+%.fold3.H.ptg: text%2.ptg
+	cat $< \
+		| tail -n +60001 \
+		| head -n 60000 \
+		| tail -n 20000 \
+		> $@
+
+# Fold 4
+%.fold4.S.ptg: text%2.ptg
+	cat $< \
+		| tail -n +120001 \
+		| head -n 40000 > $@
+
+%.fold4.T.ptg: text%2.ptg
+	cat $< | head -n 120000 > $@
+	cat $< | tail -n +180001 >> $@
+	cat $@ | head -n$(TRAIN_SIZE) | sponge $@
+
+%.fold4.H.ptg: text%2.ptg
+	cat $< \
+		| tail -n +120001 \
+		| head -n 60000 \
+		| tail -n 20000 \
+		> $@
+
+# Fold 5
+%.fold5.S.ptg: text%2.ptg
+	cat $< \
+		| tail -n +180001 \
+		| head -n 40000 > $@
+
+%.fold5.T.ptg: text%2.ptg
+	cat $< | head -n 180000 > $@
+	cat $< | tail -n +240001 >> $@
+	cat $@ | head -n$(TRAIN_SIZE) | sponge $@
+
+%.fold5.H.ptg: text%2.ptg
+	cat $< \
+		| tail -n +180001 \
+		| head -n 60000 \
+		| tail -n 20000 \
 		> $@
 
 #
@@ -135,4 +211,5 @@ clean:
 		*.unknown-word-rules \
 		*.context-rules \
 		*.dummy-tagged \
-		*.tagged
+		*.tagged \
+		*.accuracy
