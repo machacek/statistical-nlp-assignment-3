@@ -3,7 +3,7 @@ SHELL = /bin/bash
 BRILL_DIR = $(shell first_existing /home/mmachace/RULE_BASED_TAGGER_V1.14)
 BRILL_TAGGER = $(BRILL_DIR)/Bin_and_Data/tagger
 
-TRAIN_SIZE = 10000
+TRAIN_SIZE = 100000
 
 .PHONY: all clean
 
@@ -33,7 +33,7 @@ all: en.fold1.S.accuracy en.fold2.S.accuracy en.fold3.S.accuracy en.fold4.S.accu
 		$*.T.part2.dummy-tagged \
 		$@ \
 		$*.T.part1.lexicon ; \
-	[ $$? -eq 224 ] # XXX The learner returns exit code 224
+	echo "Exit code: $$? (contextual-rule-learn)" | tee $*.exit-code
 
 %.T.part2.dummy-tagged: %.T.part1.lexicon %.T.part2.untagged %.bigram-list %.unknown-word-rules %.word-list
 	export PATH=$(BRILL_DIR)/Bin_and_Data:$$PATH && \
@@ -212,4 +212,5 @@ clean:
 		*.context-rules \
 		*.dummy-tagged \
 		*.tagged \
-		*.accuracy
+		*.accuracy \
+		*.exit-code
