@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+import argparse
+import tabulate
+import numpy
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Tabulates results and compute average and standard deviation", 
+        epilog="Author: Matous Machacek <machacekmatous@gmail.com>")
+    
+    
+    parser.add_argument("files",
+            help="Files with computed accuracy",
+            nargs='+',
+            metavar='file',
+            type=argparse.FileType('r'),
+            )
+
+    return parser.parse_args()
+args = parse_args()
+
+def main():
+
+    table = []
+    results = []
+
+    for file in args.files:
+        name = file.name
+        accuracy = float(file.read().strip())
+        table.append((name, accuracy, None))
+        results.append(accuracy)
+
+    mean = numpy.mean(results)
+    std  = numpy.std(results)
+
+    table.append(("mean", mean, std))
+
+    print(tabulate.tabulate(
+            table,
+            headers = ["fold", "accuracy", "stdev"],
+            tablefmt = 'simple',
+        ))
+    
+
+
+if __name__ == '__main__':
+    main()

@@ -9,11 +9,14 @@ TRAIN_SIZE = 10000
 
 .SECONDARY:
 
-all: en.fold1.S.accuracy en.fold2.S.accuracy en.fold3.S.accuracy en.fold4.S.accuracy en.fold5.S.accuracy cz.fold1.S.accuracy cz.fold2.S.accuracy cz.fold3.S.accuracy cz.fold4.S.accuracy cz.fold5.S.accuracy
+all: en.results cz.results
 
 #
 # Evaluace
 #
+%.results: %.fold1.S.accuracy %.fold2.S.accuracy %.fold3.S.accuracy %.fold4.S.accuracy %.fold5.S.accuracy
+	./results-summary $^ > $@
+
 %.accuracy: %.tagged %.spl
 	./measure-accuracy $^ > $@
 
