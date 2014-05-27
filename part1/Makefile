@@ -3,7 +3,7 @@ SHELL = /bin/bash
 BRILL_DIR = $(shell first_existing /home/mmachace/RULE_BASED_TAGGER_V1.14)
 BRILL_TAGGER = $(BRILL_DIR)/Bin_and_Data/tagger
 
-TRAIN_SIZE = 100000
+TRAIN_SIZE = 10000
 
 .PHONY: all clean
 
@@ -137,8 +137,8 @@ all: en.fold1.S.accuracy en.fold2.S.accuracy en.fold3.S.accuracy en.fold4.S.accu
 		| head -n 40000 > $@
 
 %.fold3.T.ptg: text%2.ptg
-	cat $< | head -n 60000 > $@
-	cat $< | tail -n +120001 >> $@
+	cat $< | head -n 60000 > $@; \
+	cat $< | tail -n +120001 >> $@; \
 	cat $@ | head -n$(TRAIN_SIZE) | sponge $@
 
 %.fold3.H.ptg: text%2.ptg
@@ -155,8 +155,8 @@ all: en.fold1.S.accuracy en.fold2.S.accuracy en.fold3.S.accuracy en.fold4.S.accu
 		| head -n 40000 > $@
 
 %.fold4.T.ptg: text%2.ptg
-	cat $< | head -n 120000 > $@
-	cat $< | tail -n +180001 >> $@
+	cat $< | head -n 120000 > $@; \
+	cat $< | tail -n +180001 >> $@; \
 	cat $@ | head -n$(TRAIN_SIZE) | sponge $@
 
 %.fold4.H.ptg: text%2.ptg
@@ -173,8 +173,8 @@ all: en.fold1.S.accuracy en.fold2.S.accuracy en.fold3.S.accuracy en.fold4.S.accu
 		| head -n 40000 > $@
 
 %.fold5.T.ptg: text%2.ptg
-	cat $< | head -n 180000 > $@
-	cat $< | tail -n +240001 >> $@
+	cat $< | head -n 180000 > $@; \
+	cat $< | tail -n +240001 >> $@; \
 	cat $@ | head -n$(TRAIN_SIZE) | sponge $@
 
 %.fold5.H.ptg: text%2.ptg
