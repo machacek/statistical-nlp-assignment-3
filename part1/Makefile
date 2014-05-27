@@ -1,6 +1,6 @@
 SHELL = /bin/bash
 
-BRILL_DIR = $(shell first_existing /home/mmachace/RULE_BASED_TAGGER_V1.14)
+BRILL_DIR = $(shell first_existing /home/mmachace/RULE_BASED_TAGGER_V1.14 /home/machacek/RULE_BASED_TAGGER_V1.14)
 BRILL_TAGGER = $(BRILL_DIR)/Bin_and_Data/tagger
 
 TRAIN_SIZE = 10000
