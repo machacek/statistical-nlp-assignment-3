@@ -215,4 +215,5 @@ clean:
 		*.dummy-tagged \
 		*.tagged \
 		*.accuracy \
-		*.exit-code
+		*.exit-code \
+		run_make.sh.*

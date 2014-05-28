@@ -24,7 +24,11 @@ def main():
     tag_counters = collections.defaultdict(collections.Counter)
     for line in args.input:
         for item in line.split():
-            word, tag = item.split('/',2) 
+            try:
+                word, tag = item.split('/',2) 
+            except ValueError:
+                print(line, file=sys.stderr)
+                raise
             tag_counters[word][tag] += 1
     
     for word, tag_counter in tag_counters.items():
