@@ -3,7 +3,7 @@ SHELL = /bin/bash
 BRILL_DIR = $(shell first_existing /home/mmachace/RULE_BASED_TAGGER_V1.14 /home/machacek/RULE_BASED_TAGGER_V1.14)
 BRILL_TAGGER = $(BRILL_DIR)/Bin_and_Data/tagger
 
-TRAIN_SIZE = 10000
+TRAIN_SIZE = 10000000
 
 .PHONY: all clean
 
@@ -53,7 +53,6 @@ all: en.results cz.results
 # Trenovani pravidel pro neznama slova
 #
 %.unknown-word-rules: %.word-list %.T.part1.word-tag-list %.bigram-list
-	# cp unk $@
 	perl $(BRILL_DIR)/Learner_Code/unknown-lexical-learn.prl \
 			$^ 300 $@
 
