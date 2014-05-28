@@ -1,0 +1,8 @@
+fold                   accuracy      stdev
+-------------------  ----------  ---------
+cz.fold1.S.accuracy    0.788352
+cz.fold2.S.accuracy    0.828949
+cz.fold3.S.accuracy    0.791098
+cz.fold4.S.accuracy    0.793127
+cz.fold5.S.accuracy    0.796245
+mean                   0.799554  0.0149221
