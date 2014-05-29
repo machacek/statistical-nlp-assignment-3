@@ -87,12 +87,16 @@ class SupervisedHMMTagger(object):
                 count += 1
         return -sum / count
 
+    def decode(self, data):
+        for sentence in data:
+            yield self.decode_sentence(sentence)
+
     def decode_sentence(self, sentence):
         words = list(sentence)
 
         # Viterbi algorithm
         TrelisNode = namedtuple("TrelisNode", ["log_alpha","previous_node","tag"])
-        stage = { self.start_state() : TrelisNode(log_alpha=0, previous=None, tag=None) }
+        stage = { self.start_state() : TrelisNode(log_alpha=0, previous_node=None, tag=None) }
         for word in words:
             new_stage = {}
             for previous_state, previous_node in stage.items():
@@ -104,9 +108,9 @@ class SupervisedHMMTagger(object):
 
                     state = previous_state[1:] + (tag,)
 
-                    if state not in new_stage_indexed or new_stage_indexed[state].log_alpha < log_alpha:
-                        new_node = TrelisNode(log_alpha=log_alpha, previous=previous_node, tag=tag)
-                        new_stage_indexed[state] = new_node
+                    if state not in new_stage or new_stage[state].log_alpha < log_alpha:
+                        new_node = TrelisNode(log_alpha=log_alpha, previous_node=previous_node, tag=tag)
+                        new_stage[state] = new_node
 
             stage = new_stage
 
@@ -116,7 +120,7 @@ class SupervisedHMMTagger(object):
         while node.tag is not None:
             rev_tags.append(node.tag)
             node = node.previous_node
-        return reversed(rev_tags)
+        return list(zip(words,reversed(rev_tags)))
 
     def tag_probability(self, tag, tag_history):
         sum = 0
@@ -137,9 +141,9 @@ class SupervisedHMMTagger(object):
         return nominator / denominator
     
     def possible_tags(self, word):
-        #tags = self.word_lexicon[word]
-        #return tags if tags else self.tag_lexicon.keys()
-        return self.tag_lexicon.keys()
+        tags = self.word_lexicon[word]
+        return tags if tags else self.tag_lexicon.keys()
+        #return self.tag_lexicon.keys()
 
     def vocabulary_size(self, tag=None):
         if tag is None:
@@ -152,7 +156,7 @@ class SupervisedHMMTagger(object):
         return log2(self.tag_probability(tag, tag_history))
 
     def log_word_probability(self, word, tag):
-        return log2(self.log_word_probability(word, tag))
+        return log2(self.word_probability(word, tag))
 
     def start_state(self):
         return (self.n - 1) * (None,)
