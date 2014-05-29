@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+import sys
+import argparse
+import pickle
+from hmm import SupervisedHMMTagger
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Trains HMM model for POS tagging", 
+        epilog="Author: Matous Machacek <machacekmatous@gmail.com>")
+    
+    parser.add_argument("train",
+            help="A file in spl format with training data, use '-' for stdin",
+            type=SPLReader,
+            )
+    
+    parser.add_argument("heldout",
+            help="A file in spl format with heldout data used for smoothing, use '-' for stdin",
+            type=SPLReader,
+            )
+    
+    parser.add_argument("model",
+            help="A file where the created model will be stored. Omit or use '-' for stdout",
+            nargs='?',
+            default=sys.stdout.buffer,
+            type=argparse.FileType('wb'),
+            )
+
+    return parser.parse_args()
+
+def main():
+    args = parse_args()
+    tagger = SupervisedHMMTagger(n=3)
+    tagger.train_parameters(args.train)
+    tagger.train_lambdas(args.heldout)
+    pickle.dump(tagger, args.model)
+
+class SPLReader(object):
+    def __init__(self, filename):
+        if filename == '-':
+            self.file = sys.stdin
+        else:
+            self.file = open(filename, mode='r', encoding='utf-8')
+
+    def __iter__(self):
+        for line in self.file:
+            yield [item.split('/',2) for item in line.split()]
+
+    def __del__(self):
+        if self.file is not sys.stdin:
+            self.file.close()
+
+if __name__ == '__main__':
+    main()

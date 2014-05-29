@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
-from collection import namedtuple, Counter
+from collections import namedtuple, Counter, defaultdict, deque
 from math import log2
 from itertools import zip_longest
+import sys
 
 class SupervisedHMMTagger(object):
-    def __init__(self, train_data, n=3):
+    def __init__(self, n=3):
         self.n = n 
-        self.lambdas = (n+1) * (1,) # pocatecni parametry vylazovani, pozor, parametry jsou v obracenem poradi
+        self.lambdas = (n+1) * (1/(n+1),) # pocatecni parametry vylazovani, pozor, parametry jsou v obracenem poradi
         self.c_tw = Counter() # pocet videnycn dvojic tag, slovo (c_wt ze slidu)
         self.c_t  = Counter() # pocet videnych tagu (c_t ze slidu)
         self.c_h  = Counter() # pocet videnych historii tagu (c_t(n-1) ze slidu)
         self.c_ht = Counter() # pocet videnych tag n-gramu (c_tn ze slidu) 
+        self.word_lexicon = defaultdict(set)
+        self.tag_lexicon = defaultdict(set)
 
-    def train_file(self, file):
-        for line in file:
-            sentence = [item.split('/',2) for item in line.split()]
-            self.train_sentence(sentence)
+    def train_parameters(self, train_data):
+        for sentence in train_data:
+            self.train_parameters_sentence(sentence)
 
-    def train_sentence(self, sentence):
-        sentence = list(sentence)
+    def train_parameters_sentence(self, sentence):
         words = [word for word, tag in sentence]
         tags = [tag for word, tag in sentence]
         for word, tag, tag_history in zip(words, tags, self.history_generator(tags)):
@@ -27,15 +28,18 @@ class SupervisedHMMTagger(object):
             for suffix in suffixes(tag_history):
                 self.c_h[suffix] += 1
                 self.c_ht[suffix, tag] += 1
+            self.word_lexicon[word].add(tag)
+            self.tag_lexicon[tag].add(word)
 
     def train_lambdas(self, held_out_data):
-        tags = [tag for word,tag in held_out_data]
+        held_out_data = list(held_out_data)
+        
         epsilon = 0.001
 
         # Debug output
         print("Starting Smoothing EM Algorithm", file=sys.stderr)
         print("Actual Lambdas:", self.lambdas, file=sys.stderr)
-        print("Actual Cross Entropy:", self.cross_entropy(tags), file=sys.stderr)
+        print("Actual Cross Entropy:", self.tag_cross_entropy(held_out_data), file=sys.stderr)
 
         done = False
         iteration = 0
@@ -46,11 +50,13 @@ class SupervisedHMMTagger(object):
             # Prepare list of lambda multiplicators
             lambdas = [0 for _ in self.lambdas]
 
-            for tag, tag_history in zip(tags, history_generator(tags)):
-                interpolated_prob = self.tag_probability(tag, tag_history)
-                for i, suffix in enumerate(suffixes(tag_history)):
-                    lambdas[i] += self.n_tag_probability(tag, suffix) / interpolated_prob
-                lambdas[-1] +=  1 / (self.vocabulary_size() * interpolated_prob)
+            for sentence in held_out_data:
+                tags = [tag for word,tag in sentence]
+                for tag, tag_history in zip(tags, self.history_generator(tags)):
+                    interpolated_prob = self.tag_probability(tag, tag_history)
+                    for i, suffix in enumerate(suffixes(tag_history)):
+                        lambdas[i] += self.n_tag_probability(tag, suffix) / interpolated_prob
+                    lambdas[-1] +=  1 / (self.vocabulary_size() * interpolated_prob)
             
             # Multiply with old lambdas and normalize
             lambdas = [lambda_ * lambda_mul for lambda_, lambda_mul in zip(self.lambdas, lambdas)]
@@ -67,16 +73,19 @@ class SupervisedHMMTagger(object):
             self.lambdas = lambdas
             
             print("New Lambdas:", self.lambdas, file=sys.stderr)
-            print("New Cross Entropy:", self.tag_cross_entropy(tags), file=sys.stderr)
+            print("New Cross Entropy:", self.tag_cross_entropy(held_out_data), file=sys.stderr)
 
         print("End of EM Smoothing Algorithm", file=sys.stderr)
 
-    def tag_cross_entropy(self, held_out_tags):
+    def tag_cross_entropy(self, held_out_data):
         sum = 0
-        tags = [tag for word,tag in held_out_tags]
-        for tag, tag_history in zip(tags, history_generator(tags)):
-            sum += self.log_tag_probability(tag, tag_history)
-        return -sum / len(tags);
+        count = 0
+        for sentence in held_out_data:
+            tags = [tag for word,tag in sentence]
+            for tag, tag_history in zip(tags, self.history_generator(tags)):
+                sum += self.log_tag_probability(tag, tag_history)
+                count += 1
+        return -sum / count
 
     def decode_sentence(self, sentence):
         words = list(sentence)
@@ -109,12 +118,6 @@ class SupervisedHMMTagger(object):
             node = node.previous_node
         return reversed(rev_tags)
 
-    def possible_tags(self, word):
-        pass
-
-    def vocabulary_size(self, tag=None):
-        pass
-
     def tag_probability(self, tag, tag_history):
         sum = 0
         for lambda_coeff, suffix in safe_zip(self.lambdas[:-1], suffixes(tag_history)):
@@ -122,7 +125,7 @@ class SupervisedHMMTagger(object):
         sum += self.lambdas[-1] / self.vocabulary_size()
         return sum
 
-    def n_tag_probability(self, tag, tag_history):
+    def n_tag_probability(self, tag, suffix):
         try:
             return self.c_ht[suffix, tag] / self.c_h[suffix] 
         except ZeroDivisionError:
@@ -132,6 +135,18 @@ class SupervisedHMMTagger(object):
         nominator = self.c_tw[tag, word] + 1
         denominator = self.c_t[tag] + self.vocabulary_size(tag)
         return nominator / denominator
+    
+    def possible_tags(self, word):
+        #tags = self.word_lexicon[word]
+        #return tags if tags else self.tag_lexicon.keys()
+        return self.tag_lexicon.keys()
+
+    def vocabulary_size(self, tag=None):
+        if tag is None:
+            return len(self.word_lexicon)
+        else:
+            return len(self.tag_lexicon[tag])
+
 
     def log_tag_probability(self, tag, tag_history):
         return log2(self.tag_probability(tag, tag_history))
@@ -142,7 +157,7 @@ class SupervisedHMMTagger(object):
     def start_state(self):
         return (self.n - 1) * (None,)
 
-    def history_generator(iterable):
+    def history_generator(self, iterable):
         iterator = iter(iterable)
         n_gram = deque(self.start_state())
         while True:
