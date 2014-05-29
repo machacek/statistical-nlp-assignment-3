@@ -3,6 +3,7 @@ from collections import namedtuple, Counter, defaultdict, deque
 from math import log2
 from itertools import zip_longest
 import sys
+import heapq
 
 class SupervisedHMMTagger(object):
     def __init__(self, n=3):
@@ -94,6 +95,10 @@ class SupervisedHMMTagger(object):
     def decode_sentence(self, sentence):
         words = list(sentence)
 
+        max_number_of_states_in_stage = 50
+        
+        print("Decoding sentence", sentence, file=sys.stderr)
+
         # Viterbi algorithm
         TrelisNode = namedtuple("TrelisNode", ["log_alpha","previous_node","tag"])
         stage = { self.start_state() : TrelisNode(log_alpha=0, previous_node=None, tag=None) }
@@ -112,7 +117,9 @@ class SupervisedHMMTagger(object):
                         new_node = TrelisNode(log_alpha=log_alpha, previous_node=previous_node, tag=tag)
                         new_stage[state] = new_node
 
-            stage = new_stage
+            # pruning
+            pruned = heapq.nlargest(max_number_of_states_in_stage, new_stage.items(), key=lambda x: x[1].log_alpha)
+            stage = dict(pruned)
 
         # Backtrace the best tag path
         node = max(stage.values(), key=lambda x: x.log_alpha)

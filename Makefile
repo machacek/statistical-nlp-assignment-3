@@ -9,21 +9,41 @@ TRAIN_SIZE = 10000000
 
 .SECONDARY:
 
-all: en.results cz.results
+all: en.hmm-supervised.results cz.hmm-supervised.results
+
+#########################################################
+# Supervised HMM experiment                             #
+#########################################################
+
+%.hmm-supervised.results: %.fold1.S.hmm-supervised.accuracy %.fold2.S.hmm-supervised.accuracy %.fold3.S.hmm-supervised.accuracy %.fold4.S.hmm-supervised.accuracy %.fold5.S.hmm-supervised.accuracy
+	./results-summary $^ > $@
+
+%.hmm-supervised.accuracy: %.hmm-supervised.tagged %.spl
+	./measure-accuracy $^ > $@
+
+%.S.hmm-supervised.tagged: %.S.untagged %.hmm-supervised.model
+	cat $< | ./hmm-decode $*.hmm-supervised.model > $@
+
+%.hmm-supervised.model: %.T.spl %.H.spl
+	./hmm-train-model $^ > $@
+
+#########################################################
+# Brill's tagger experiment                             #
+#########################################################
 
 #
 # Evaluace
 #
-%.results: %.fold1.S.accuracy %.fold2.S.accuracy %.fold3.S.accuracy %.fold4.S.accuracy %.fold5.S.accuracy
+%.brill.results: %.fold1.S.brill.accuracy %.fold2.S.brill.accuracy %.fold3.S.brill.accuracy %.fold4.S.brill.accuracy %.fold5.S.brill.accuracy
 	./results-summary $^ > $@
 
-%.accuracy: %.tagged %.spl
+%.brill.accuracy: %.brill.tagged %.spl
 	./measure-accuracy $^ > $@
 
 #
 # Tagovani testovaci sady
 #
-%.S.tagged: %.T.lexicon %.S.untagged %.bigram-list %.unknown-word-rules %.context-rules
+%.S.brill.tagged: %.T.lexicon %.S.untagged %.bigram-list %.unknown-word-rules %.context-rules
 	export PATH=$(BRILL_DIR)/Bin_and_Data:$$PATH && \
 	$(BRILL_TAGGER) $^ > $@
 
@@ -77,6 +97,10 @@ all: en.results cz.results
 
 %.T.part2.spl: %.T.spl
 	cat $< | awk 'NR % 2 == 1' > $@
+
+#########################################################
+# Ostatni pomocne cile                                  #
+#########################################################
 
 #
 # Genericke pravidlo pro vytvoreni seznamu nejcastejsich dvojic word/tag
@@ -216,4 +240,6 @@ clean:
 		*.tagged \
 		*.accuracy \
 		*.exit-code \
+		*.results \
+		*.model \
 		run_make.sh.*
