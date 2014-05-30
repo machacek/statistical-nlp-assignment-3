@@ -1,0 +1,8 @@
+fold                                  accuracy      stdev
+----------------------------------  ----------  ---------
+cz.fold1.S.hmm-supervised.accuracy    0.78899
+cz.fold2.S.hmm-supervised.accuracy    0.801849
+cz.fold3.S.hmm-supervised.accuracy    0.778418
+cz.fold4.S.hmm-supervised.accuracy    0.804538
+cz.fold5.S.hmm-supervised.accuracy    0.812093
+mean                                  0.797178  0.0119786

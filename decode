@@ -5,7 +5,7 @@ import pickle
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Trains HMM model for POS tagging", 
+        description="Decodes POS tags using given model", 
         epilog="Author: Matous Machacek <machacekmatous@gmail.com>")
     
     parser.add_argument("model",

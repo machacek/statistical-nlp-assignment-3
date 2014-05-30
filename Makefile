@@ -9,7 +9,23 @@ TRAIN_SIZE = 10000000
 
 .SECONDARY:
 
-all: en.hmm-supervised.results cz.hmm-supervised.results
+all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-supervised.results 
+
+#########################################################
+# Baseline experiment                                   #
+#########################################################
+
+%.baseline.results: %.fold1.S.baseline.accuracy %.fold2.S.baseline.accuracy %.fold3.S.baseline.accuracy %.fold4.S.baseline.accuracy %.fold5.S.baseline.accuracy
+	./results-summary $^ > $@
+
+%.baseline.accuracy: %.baseline.tagged %.spl
+	./measure-accuracy $^ > $@
+
+%.S.baseline.tagged: %.S.untagged %.baseline.model
+	cat $< | ./decode $*.baseline.model > $@
+
+%.baseline.model: %.T.spl
+	./train-model-baseline $< > $@
 
 #########################################################
 # Supervised HMM experiment                             #
@@ -22,10 +38,10 @@ all: en.hmm-supervised.results cz.hmm-supervised.results
 	./measure-accuracy $^ > $@
 
 %.S.hmm-supervised.tagged: %.S.untagged %.hmm-supervised.model
-	cat $< | ./hmm-decode $*.hmm-supervised.model > $@
+	cat $< | ./decode $*.hmm-supervised.model > $@
 
 %.hmm-supervised.model: %.T.spl %.H.spl
-	./hmm-train-model $^ > $@
+	./train-model-hmm $^ > $@
 
 #########################################################
 # Brill's tagger experiment                             #
