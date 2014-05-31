@@ -2,6 +2,7 @@
 import sys
 import argparse
 import pickle
+from utils import SentenceReader
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -27,22 +28,6 @@ def main():
     tagger = pickle.load(args.model)
     for decoded_sentence in tagger.decode(args.corpus):
         print(*["%s/%s" % (word,tag) for word, tag in decoded_sentence])
-
-
-class SentenceReader(object):
-    def __init__(self, filename):
-        if filename == '-':
-            self.file = sys.stdin
-        else:
-            self.file = open(filename, mode='r', encoding='utf-8')
-
-    def __iter__(self):
-        for line in self.file:
-            yield line.split()
-
-    def __del__(self):
-        if self.file is not sys.stdin:
-            self.file.close()
 
 if __name__ == '__main__':
     main()

@@ -167,15 +167,147 @@ class HMMTagger(object):
 
     def n_tag_probability(self, tag, suffix):
         try:
-            return self.c_ht[suffix, tag] / self.c_h[suffix] 
-        except ZeroDivisionError:
-            return 1/self.vocabulary_size()
+            return self.history_tag_expected_counts[suffix, tag] / self.history_expected_counts[suffix]
+        except AttributeError:
+            try:
+                return self.c_ht[suffix, tag] / self.c_h[suffix] 
+            except ZeroDivisionError:
+                return 1/self.vocabulary_size()
 
     def word_probability(self, word, tag):
-        nominator = self.c_tw[tag, word] + 1
-        denominator = self.c_t[tag] + self.vocabulary_size(tag)
-        return nominator / denominator
+        try:
+            nominator = self.tag_word_expected_counts[tag,word]
+            denominator = self.tag_expected_counts[tag]
+            return nominator / denominator
+        except AttributeError:
+            nominator = self.c_tw[tag, word] + 1
+            denominator = self.c_t[tag] + self.vocabulary_size(tag)
+            return nominator / denominator
 
+    def train_unlabeled(self, unlabeled_sentences):
+        unlabeled_sentences = list(unlabeled_sentences)
+
+        # Forward-Backward algorithm
+        for i in range(1,11):
+
+            print("\nForward-Backward algorithm - iteration %s" % i, file=sys.stderr)
+
+            tag_word_expected_counts = Counter()
+            tag_expected_counts = Counter()
+            history_tag_expected_counts = Counter()
+            history_expected_counts = Counter()
+
+            # Setting initial counts_N high lowers number of counts rescaling 
+            # May be still too small ???
+            counts_N = 1e70
+
+            for sentence in unlabeled_sentences:
+                print("\nTraining on sentence", sentence, file=sys.stderr)
+
+                aggregated_N = 1
+
+                # Compute forward probabilities (alphas)
+                print("Computing forward probabilities", file=sys.stderr)
+                stages = [{ self.start_state() : ForwardBackwardTrelisNode(alpha=1) }]
+                for word in sentence:
+                    new_stage = defaultdict(ForwardBackwardTrelisNode)
+                    for previous_state, previous_node in stages[-1].items():
+                        for tag in self.possible_tags(word):
+
+                            # Computint alpha increase
+                            alpha_inc = previous_node.alpha \
+                                    * self.tag_probability(tag, previous_state) \
+                                    * self.word_probability(word, tag)
+                            
+                            # Increasing the alpha
+                            new_state = previous_state[1:] + (tag,)
+                            new_stage[new_state].inc_alpha(alpha_inc)
+
+                    # Adding the new stage to the list
+                    stages.append(new_stage)
+
+                    # Normalizing alphas
+                    N = 1/sum(node.alpha for node in new_stage.values())
+                    for stage in stages:
+                        for node in stage.values():
+                            node.alpha *= N
+                    aggregated_N *= N
+
+                # Compute backward probabilities (betas)
+                print("Computing backward probabilities", file=sys.stderr)
+                for node in stages[-1].values():
+                    node.beta=1
+                for t, word in reversed(list(enumerate(sentence))):
+                    current_stage = stages[t]
+                    next_stage = stages[t+1]
+                    for state, node in current_stage.items():
+                        for tag in self.possible_tags(word):
+
+                            # Getting next stage node for given tag, to which there is an edge from actual node
+                            next_state = state[1:] + (tag,)
+                            next_node = next_stage[next_state]
+
+                            # Computing beta increase
+                            beta_inc = next_node.beta \
+                                    * self.word_probability(word, tag) \
+                                    * self.tag_probability(tag, state)
+
+                            node.inc_beta(beta_inc)
+
+                    # Normalizing betas
+                    # N = 1/sum(node.beta for node in current_stage.values())
+                    # for i in range(t,len(stages)):
+                    #    for node in stages[i].values():
+                    #        node.beta *= N
+                    # aggregated_N *= N
+
+                # We have to unify scaling factors for counts (counts_N) and
+                # current sentence (aggregated_N). If the scaling factor of the
+                # counts is bigger than actual sentence scaling factor, we will
+                # scale current sentence counts when adding to counts,
+                # otherwise we will rescale current counts.
+                if counts_N > aggregated_N:
+                    print("Not rescaling counts, counts_N: %s, aggregated_N: %s" % (counts_N,aggregated_N), file=sys.stderr)
+                    rescale_factor = counts_N / aggregated_N
+                    rescale = lambda x: rescale_factor * x
+                else:
+                    print("Rescaling_counts, counts_N: %s, aggregated_N: %s" % (counts_N,aggregated_N), file=sys.stderr)
+                    rescale_factor = aggregated_N / counts_N
+                    for counts in (tag_word_expected_counts, tag_expected_counts, history_tag_expected_counts, history_expected_counts):
+                        for key in counts:
+                            counts[key] *= rescale_factor
+                    counts_N *= rescale_factor
+                    rescale = lambda x: x
+
+                # Accumulate the counts
+                print("Accumulating expected counts", file=sys.stderr)
+                for t, word in enumerate(sentence, 1):
+                    for tag in self.possible_tags(word):
+                        for previous_state, previous_node in stages[t-1].items():
+                            state = previous_state[1:] + (tag,)
+                            node = stages[t][state]
+                            
+                            expected_count_inc = rescale(
+                                      previous_node.alpha
+                                    * self.tag_probability(tag, previous_state)
+                                    * self.word_probability(word, tag)
+                                    * node.beta
+                                    )
+
+                            tag_word_expected_counts[tag,word] += expected_count_inc
+                            tag_expected_counts[tag] += expected_count_inc
+
+                            history = previous_state
+                            for suffix in suffixes(history):
+                                history_tag_expected_counts[suffix, tag] += expected_count_inc
+                                history_expected_counts[suffix] += expected_count_inc
+            
+            # Substitute current counts
+            self.tag_word_expected_counts = tag_word_expected_counts
+            self.tag_expected_counts = tag_expected_counts
+            self.history_tag_expected_counts = history_tag_expected_counts
+            self.history_expected_counts = history_expected_counts
+                
 class ViterbiTrelisNode(object):
     __slots__ = ["log_gamma", "previous_node", "tag"]
     def __init__(self, log_gamma=None, previous_node=None, tag=None):
@@ -188,32 +320,18 @@ class ViterbiTrelisNode(object):
             self.log_gamma = log_gamma
             self.previous_node = previous_node
             self.tag = tag
-        
-class SupervisedHMMTagger(HMMTagger):
-    pass
 
-class UnsupervisedHMMTagger(HMMTagger):
-    def train_unlabeled(self, unlabeled_sentences):
-        # Forward-Backward algorithm
+class ForwardBackwardTrelisNode(object):
+    __slots__ = ["alpha", "beta"]
+    def __init__(self, alpha=0, beta=0):
+        self.alpha = alpha
+        self.beta = beta
 
-        unlabeled_sentences = list(unlabeled_sentences)
-        
-        TrelisNode = namedtuple("TrelisNode", ["log_alpha","log_beta"])
-
-        done = False
-        while not done:
-            counts3 = Counter()
-            counts2 = Counter()
-            counts1 = Counter()
-
-            for sentence in unlabeled_sentences:
-                # Compute forward probabilities (alphas)
-                stages = [ ]
-
-
-        
-
-
+    def inc_alpha(self, alpha_inc):
+        self.alpha += alpha_inc
+    
+    def inc_beta(self, beta_inc):
+        self.beta += beta_inc
 
 def safe_zip(*args):
     for n_tuple in zip_longest(*args):
@@ -223,6 +341,3 @@ def safe_zip(*args):
 def suffixes(sequence):
     for i in range(len(sequence) + 1):
         yield sequence[i:]
-
-
-

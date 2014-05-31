@@ -9,13 +9,14 @@ TRAIN_SIZE = 10000000
 
 .SECONDARY:
 
-all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-supervised.results 
+#all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-supervised.results 
+all: en.hmm-supervised.results cz.hmm-supervised.results 
 
 #########################################################
 # Baseline experiment                                   #
 #########################################################
 
-%.baseline.results: %.fold1.S.baseline.accuracy %.fold2.S.baseline.accuracy %.fold3.S.baseline.accuracy %.fold4.S.baseline.accuracy %.fold5.S.baseline.accuracy
+%.baseline.results: %.fold1.S.baseline.accuracy
 	./results-summary $^ > $@
 
 %.baseline.accuracy: %.baseline.tagged %.spl
@@ -31,7 +32,7 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 # Supervised HMM experiment                             #
 #########################################################
 
-%.hmm-supervised.results: %.fold1.S.hmm-supervised.accuracy %.fold2.S.hmm-supervised.accuracy %.fold3.S.hmm-supervised.accuracy %.fold4.S.hmm-supervised.accuracy %.fold5.S.hmm-supervised.accuracy
+%.hmm-supervised.results: %.fold1.S.hmm-supervised.accuracy
 	./results-summary $^ > $@
 
 %.hmm-supervised.accuracy: %.hmm-supervised.tagged %.spl
@@ -41,7 +42,29 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 	cat $< | ./decode $*.hmm-supervised.model > $@
 
 %.hmm-supervised.model: %.T.spl %.H.spl
-	./train-model-hmm $^ > $@
+	./train-model-hmm $< --heldout $*.H.spl > $@
+
+#########################################################
+# Unsupervised HMM experiment                           #
+#########################################################
+
+%.hmm-unsupervised.results: %.fold1.S.hmm-unsupervised.accuracy
+	./results-summary $^ > $@
+
+%.hmm-unsupervised.accuracy: %.hmm-unsupervised.tagged %.spl
+	./measure-accuracy $^ > $@
+
+%.S.hmm-unsupervised.tagged: %.S.untagged %.hmm-unsupervised.model
+	cat $< | ./decode $*.hmm-unsupervised.model > $@
+
+%.hmm-unsupervised.model: %.T.labeled.spl %.T.unlabeled.spl
+	./train-model-hmm $< --unlabeled $*.T.unlabeled.spl > $@
+
+%.T.labeled.spl: %.T.spl
+	cat $< | head -n1000 > $@
+
+%.T.unlabeled.spl: %.T.spl
+	cat $< | tail -n+1001 | ./remove-tags > $@
 
 #########################################################
 # Brill's tagger experiment                             #

@@ -3,6 +3,7 @@ import sys
 import argparse
 import pickle
 from baseline import BaselineTagger
+from util import SPLReader
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -28,21 +29,6 @@ def main():
     tagger = BaselineTagger()
     tagger.train_parameters(args.train)
     pickle.dump(tagger, args.model)
-
-class SPLReader(object):
-    def __init__(self, filename):
-        if filename == '-':
-            self.file = sys.stdin
-        else:
-            self.file = open(filename, mode='r', encoding='utf-8')
-
-    def __iter__(self):
-        for line in self.file:
-            yield [item.split('/',2) for item in line.split()]
-
-    def __del__(self):
-        if self.file is not sys.stdin:
-            self.file.close()
 
 if __name__ == '__main__':
     main()
