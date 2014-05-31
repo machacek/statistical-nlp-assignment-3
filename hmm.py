@@ -5,7 +5,7 @@ from itertools import zip_longest
 import sys
 import heapq
 
-class SupervisedHMMTagger(object):
+class HMMTagger(object):
     def __init__(self, n=3):
         self.n = n 
         self.lambdas = (n+1) * (1/(n+1),) # pocatecni parametry vylazovani, pozor, parametry jsou v obracenem poradi
@@ -100,52 +100,33 @@ class SupervisedHMMTagger(object):
         print("Decoding sentence", sentence, file=sys.stderr)
 
         # Viterbi algorithm
-        TrelisNode = namedtuple("TrelisNode", ["log_alpha","previous_node","tag"])
-        stage = { self.start_state() : TrelisNode(log_alpha=0, previous_node=None, tag=None) }
+        stage = { self.start_state() : ViterbiTrelisNode(log_gamma=0) }
         for word in words:
-            new_stage = {}
+            new_stage = defaultdict(ViterbiTrelisNode)
             for previous_state, previous_node in stage.items():
                 for tag in self.possible_tags(word):
 
-                    log_alpha = previous_node.log_alpha \
+                    # Computing gamma when comming from the previous node
+                    log_gamma = previous_node.log_gamma \
                             + self.log_tag_probability(tag, previous_state) \
                             + self.log_word_probability(word, tag)
 
+                    # Updating the state
                     state = previous_state[1:] + (tag,)
-
-                    if state not in new_stage or new_stage[state].log_alpha < log_alpha:
-                        new_node = TrelisNode(log_alpha=log_alpha, previous_node=previous_node, tag=tag)
-                        new_stage[state] = new_node
+                    new_stage[state].update_node(log_gamma, previous_node, tag)
 
             # pruning
-            pruned = heapq.nlargest(max_number_of_states_in_stage, new_stage.items(), key=lambda x: x[1].log_alpha)
+            pruned = heapq.nlargest(max_number_of_states_in_stage, new_stage.items(), key=lambda x: x[1].log_gamma)
             stage = dict(pruned)
 
         # Backtrace the best tag path
-        node = max(stage.values(), key=lambda x: x.log_alpha)
+        node = max(stage.values(), key=lambda x: x.log_gamma)
         rev_tags = []
         while node.tag is not None:
             rev_tags.append(node.tag)
             node = node.previous_node
         return list(zip(words,reversed(rev_tags)))
 
-    def tag_probability(self, tag, tag_history):
-        sum = 0
-        for lambda_coeff, suffix in safe_zip(self.lambdas[:-1], suffixes(tag_history)):
-            sum += lambda_coeff * self.n_tag_probability(tag, suffix)
-        sum += self.lambdas[-1] / self.vocabulary_size()
-        return sum
-
-    def n_tag_probability(self, tag, suffix):
-        try:
-            return self.c_ht[suffix, tag] / self.c_h[suffix] 
-        except ZeroDivisionError:
-            return 1/self.vocabulary_size()
-
-    def word_probability(self, word, tag):
-        nominator = self.c_tw[tag, word] + 1
-        denominator = self.c_t[tag] + self.vocabulary_size(tag)
-        return nominator / denominator
     
     def possible_tags(self, word):
         tags = self.word_lexicon[word]
@@ -176,6 +157,63 @@ class SupervisedHMMTagger(object):
             yield tuple(n_gram)
             n_gram.popleft()
             n_gram.append(new_item)
+    
+    def tag_probability(self, tag, tag_history):
+        sum = 0
+        for lambda_coeff, suffix in safe_zip(self.lambdas[:-1], suffixes(tag_history)):
+            sum += lambda_coeff * self.n_tag_probability(tag, suffix)
+        sum += self.lambdas[-1] / self.vocabulary_size()
+        return sum
+
+    def n_tag_probability(self, tag, suffix):
+        try:
+            return self.c_ht[suffix, tag] / self.c_h[suffix] 
+        except ZeroDivisionError:
+            return 1/self.vocabulary_size()
+
+    def word_probability(self, word, tag):
+        nominator = self.c_tw[tag, word] + 1
+        denominator = self.c_t[tag] + self.vocabulary_size(tag)
+        return nominator / denominator
+
+class ViterbiTrelisNode(object):
+    __slots__ = ["log_gamma", "previous_node", "tag"]
+    def __init__(self, log_gamma=None, previous_node=None, tag=None):
+        self.log_gamma = log_gamma
+        self.previous_node = previous_node
+        self.tag = tag
+
+    def update_node(self, log_gamma, previous_node, tag):
+        if self.log_gamma is None or self.log_gamma < log_gamma:
+            self.log_gamma = log_gamma
+            self.previous_node = previous_node
+            self.tag = tag
+        
+class SupervisedHMMTagger(HMMTagger):
+    pass
+
+class UnsupervisedHMMTagger(HMMTagger):
+    def train_unlabeled(self, unlabeled_sentences):
+        # Forward-Backward algorithm
+
+        unlabeled_sentences = list(unlabeled_sentences)
+        
+        TrelisNode = namedtuple("TrelisNode", ["log_alpha","log_beta"])
+
+        done = False
+        while not done:
+            counts3 = Counter()
+            counts2 = Counter()
+            counts1 = Counter()
+
+            for sentence in unlabeled_sentences:
+                # Compute forward probabilities (alphas)
+                stages = [ ]
+
+
+        
+
+
 
 def safe_zip(*args):
     for n_tuple in zip_longest(*args):
