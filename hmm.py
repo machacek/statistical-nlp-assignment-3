@@ -103,8 +103,8 @@ class HMMTagger(object):
         stage = { self.start_state() : ViterbiTrelisNode(log_gamma=0) }
         for word in words:
             new_stage = defaultdict(ViterbiTrelisNode)
-            for previous_state, previous_node in stage.items():
-                for tag in self.possible_tags(word):
+            for tag in self.possible_tags(word):
+                for previous_state, previous_node in stage.items():
 
                     # Computing gamma when comming from the previous node
                     log_gamma = previous_node.log_gamma \
@@ -130,8 +130,11 @@ class HMMTagger(object):
     
     def possible_tags(self, word):
         tags = self.word_lexicon[word]
-        return tags if tags else self.tag_lexicon.keys()
-        #return self.tag_lexicon.keys()
+        if tags:
+            return tags
+        else:
+            #print("Unknown word: %s" % word, file=sys.stderr)
+            return self.tag_lexicon.keys()
 
     def vocabulary_size(self, tag=None):
         if tag is None:
@@ -202,18 +205,16 @@ class HMMTagger(object):
             counts_N = 1e70
 
             for sentence in unlabeled_sentences:
-                print("\nTraining on sentence", sentence, file=sys.stderr)
 
                 aggregated_N = 1
 
                 # Compute forward probabilities (alphas)
-                print("Computing forward probabilities", file=sys.stderr)
                 stages = [{ self.start_state() : ForwardBackwardTrelisNode(alpha=1) }]
                 for word in sentence:
                     new_stage = defaultdict(ForwardBackwardTrelisNode)
-                    for previous_state, previous_node in stages[-1].items():
-                        for tag in self.possible_tags(word):
-
+                    
+                    for tag in self.possible_tags(word):
+                        for previous_state, previous_node in stages[-1].items():
                             # Computint alpha increase
                             alpha_inc = previous_node.alpha \
                                     * self.tag_probability(tag, previous_state) \
@@ -227,21 +228,22 @@ class HMMTagger(object):
                     stages.append(new_stage)
 
                     # Normalizing alphas
-                    N = 1/sum(node.alpha for node in new_stage.values())
+                    _sum = sum(node.alpha for node in new_stage.values())
+                    #print(_sum, file=sys.stderr)
+                    N = 1/_sum
                     for stage in stages:
                         for node in stage.values():
                             node.alpha *= N
                     aggregated_N *= N
 
                 # Compute backward probabilities (betas)
-                print("Computing backward probabilities", file=sys.stderr)
                 for node in stages[-1].values():
                     node.beta=1
                 for t, word in reversed(list(enumerate(sentence))):
                     current_stage = stages[t]
                     next_stage = stages[t+1]
-                    for state, node in current_stage.items():
-                        for tag in self.possible_tags(word):
+                    for tag in self.possible_tags(word):
+                        for state, node in current_stage.items():
 
                             # Getting next stage node for given tag, to which there is an edge from actual node
                             next_state = state[1:] + (tag,)
@@ -255,23 +257,24 @@ class HMMTagger(object):
                             node.inc_beta(beta_inc)
 
                     # Normalizing betas
-                    # N = 1/sum(node.beta for node in current_stage.values())
-                    # for i in range(t,len(stages)):
-                    #    for node in stages[i].values():
-                    #        node.beta *= N
-                    # aggregated_N *= N
+                    _sum = sum(node.beta for node in current_stage.values())
+                    # print(_sum, file=sys.stderr)
+                    N = 1/_sum
+                    for i in range(t,len(stages)):
+                        for node in stages[i].values():
+                            node.beta *= N
+                    aggregated_N *= N
 
                 # We have to unify scaling factors for counts (counts_N) and
                 # current sentence (aggregated_N). If the scaling factor of the
                 # counts is bigger than actual sentence scaling factor, we will
                 # scale current sentence counts when adding to counts,
                 # otherwise we will rescale current counts.
-                if counts_N > aggregated_N:
-                    print("Not rescaling counts, counts_N: %s, aggregated_N: %s" % (counts_N,aggregated_N), file=sys.stderr)
+                if True or counts_N > aggregated_N:
+                    print(aggregated_N, file=sys.stderr)
                     rescale_factor = counts_N / aggregated_N
                     rescale = lambda x: rescale_factor * x
                 else:
-                    print("Rescaling_counts, counts_N: %s, aggregated_N: %s" % (counts_N,aggregated_N), file=sys.stderr)
                     rescale_factor = aggregated_N / counts_N
                     for counts in (tag_word_expected_counts, tag_expected_counts, history_tag_expected_counts, history_expected_counts):
                         for key in counts:
@@ -280,7 +283,6 @@ class HMMTagger(object):
                     rescale = lambda x: x
 
                 # Accumulate the counts
-                print("Accumulating expected counts", file=sys.stderr)
                 for t, word in enumerate(sentence, 1):
                     for tag in self.possible_tags(word):
                         for previous_state, previous_node in stages[t-1].items():
@@ -301,12 +303,14 @@ class HMMTagger(object):
                             for suffix in suffixes(history):
                                 history_tag_expected_counts[suffix, tag] += expected_count_inc
                                 history_expected_counts[suffix] += expected_count_inc
-            
+
             # Substitute current counts
             self.tag_word_expected_counts = tag_word_expected_counts
             self.tag_expected_counts = tag_expected_counts
             self.history_tag_expected_counts = history_tag_expected_counts
             self.history_expected_counts = history_expected_counts
+
+
                 
 class ViterbiTrelisNode(object):
     __slots__ = ["log_gamma", "previous_node", "tag"]
