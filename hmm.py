@@ -2,6 +2,7 @@
 from collections import namedtuple, Counter, defaultdict, deque
 from math import log2
 from itertools import zip_longest
+from functools import reduce
 import sys
 import heapq
 
@@ -189,16 +190,15 @@ class HMMTagger(object):
             return nominator / denominator
         except AttributeError:
             nominator = self.c_tw[tag, word] + 1
-            denominator = self.c_t[tag] + self.vocabulary_size(tag)
+            denominator = self.c_t[tag] + self.vocabulary_size()
             return nominator / denominator
 
     def train_unlabeled(self, unlabeled_sentences):
         unlabeled_sentences = list(unlabeled_sentences)
 
-        log_addition = 200
 
         # Forward-Backward algorithm
-        for i in range(1,11):
+        for i in range(10):
             print("\n\nForward-Backward algorithm - iteration %s" % i, file=sys.stderr)
 
             tag_word_expected_counts = Counter()
@@ -231,9 +231,6 @@ class HMMTagger(object):
                     # Adding the new stage to the list
                     stages.append(new_stage)
 
-                sentence_log_prob = sum(node.log_alpha for node in stages[-1].values())
-                corpus_log_prob += sentence_log_prob
-                print("Sentence log probability: %s" % sentence_log_prob, file=sys.stderr)
 
                 # Compute backward probabilities (betas)
                 for node in stages[-1].values():
@@ -254,6 +251,14 @@ class HMMTagger(object):
                                     + self.log_tag_probability(tag, state)
 
                             node.log_inc_beta(log_beta_inc)
+                
+                
+                # Checkpoints
+                # for i, stage in enumerate(stages):
+                #     print(i, reduce(log_add, (node.log_alpha + node.log_beta for node in stage.values())), file=sys.stderr)
+                sentence_log_prob = reduce(log_add, (node.log_alpha for node in stages[-1].values()))
+                corpus_log_prob += sentence_log_prob
+                print("Sentence log probability: %s" % sentence_log_prob, file=sys.stderr)
 
                 # Accumulate the counts
                 for t, word in enumerate(sentence, 1):
@@ -261,23 +266,24 @@ class HMMTagger(object):
                         for previous_state, previous_node in stages[t-1].items():
                             state = previous_state[1:] + (tag,)
                             node = stages[t][state]
+
+                            #print(previous_node.log_alpha, node.log_beta, file=sys.stderr)
                             
                             log_expected_count_inc = \
                                       previous_node.log_alpha \
                                     + self.log_tag_probability(tag, previous_state) \
                                     + self.log_word_probability(word, tag) \
-                                    + node.log_beta \
-                                    + log_addition
+                                    + node.log_beta
 
                             # print(log_expected_count_inc, file=sys.stderr)
 
-                            tag_word_expected_counts[tag,word] += 2**log_expected_count_inc
-                            tag_expected_counts[tag] += 2**log_expected_count_inc
+                            tag_word_expected_counts[tag,word] += 2**(log_expected_count_inc / len(sentence))
+                            tag_expected_counts[tag] += 2**(log_expected_count_inc / len(sentence))
 
                             history = previous_state
                             for suffix in suffixes(history):
-                                history_tag_expected_counts[suffix, tag] += 2**log_expected_count_inc
-                                history_expected_counts[suffix] += 2**log_expected_count_inc
+                                history_tag_expected_counts[suffix, tag] += 2**(log_expected_count_inc / len(sentence))
+                                history_expected_counts[suffix] += 2**(log_expected_count_inc / len(sentence))
 
             # Substitute current counts
             self.tag_word_expected_counts = tag_word_expected_counts
@@ -285,13 +291,8 @@ class HMMTagger(object):
             self.history_tag_expected_counts = history_tag_expected_counts
             self.history_expected_counts = history_expected_counts
 
-            with open('word-tag-%s' % i, mode='w') as log_file:
-                for tag,word in sorted(tag_word_expected_counts, key=str):
-                    print("p(%s|%s) = %s" % (word, tag, tag_word_expected_counts[tag,word] / tag_expected_counts[tag]), file=log_file)
-            
-            with open('tag-history-%s' % i, mode='w') as log_file:
-                for history,tag in sorted(history_tag_expected_counts, key=str):
-                    print("p(%s|%s) = %s" % (tag, ','.join(history), history_tag_expected_counts[history,tag] / history_expected_counts[history]), file=log_file)
+            tag_word_sums = Counter()
+            history_tag_sums = Counter()
 
             print("Corpus log probability: %s" % corpus_log_prob, file=sys.stderr)
 
