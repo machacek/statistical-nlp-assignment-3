@@ -50,7 +50,7 @@ class HMMTagger(object):
         unlabeled_data = list(self.concat_unlabeled_sentences(unlabeled_sentences))
 
         # Forward-Backward algorithm
-        for i in range(1):
+        for i in range(10):
             print("\nForward-Backward algorithm - iteration %s" % i, file=sys.stderr)
 
             tag_word_counts = defaultdict(negative_infinity)
