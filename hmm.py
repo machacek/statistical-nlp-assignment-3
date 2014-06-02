@@ -14,6 +14,7 @@ class HMMTagger(object):
         self.tag_lexicon = defaultdict(set)
         self.transition_probs = dict()
         self.output_probs = dict()
+        self.known_words = set()
 
     def train_labeled(self, sentences):
         train_data = list(self.concat_labeled_sentences(sentences))
@@ -31,22 +32,27 @@ class HMMTagger(object):
             self.tag_lexicon[tag].add(word)
 
         # Smoothing output probabilities
-        # options:
-        #    - not do
-        #    * all possible pairs +1
-        #    - train lambdas like transition smoothing
         for word in self.word_lexicon:
             for tag in self.tag_lexicon:
                 output_probs[tag].add_count(word, 1)
 
         self.transition_probs.update(transition_probs)
         self.output_probs.update(output_probs)
+        self.known_words = set(self.word_lexicon)
     
     def train_unlabeled(self, unlabeled_sentences):
         unlabeled_data = list(self.concat_unlabeled_sentences(unlabeled_sentences))
 
+        max_iteration = 15
+        
+        # Debug output
+        print("Starting Forward-Backward algorithm", file=sys.stderr)
+        print("Algorithm ends when max number of iteration reached (%s) or convergence condition is met" % max_iteration, file=sys.stderr)
+
+        last_data_log_prob = None
+
         # Forward-Backward algorithm
-        for i in range(10):
+        for i in range(1, max_iteration + 1):
             print("\nForward-Backward algorithm - iteration %s" % i, file=sys.stderr)
 
             transition_probs = defaultdict(Distribution)
@@ -56,7 +62,7 @@ class HMMTagger(object):
             print("Computing forward probabilities", file=sys.stderr)
             stages = [{ self.start_state() : ForwardBackwardTrelisNode(log_alpha=0) }]
             for word in unlabeled_data:
-                new_stage = defaultdict(ForwardBackwardTrelisNode)
+                next_stage = defaultdict(ForwardBackwardTrelisNode)
                 
                 for tag in self.possible_tags(word):
                     for previous_state, previous_node in stages[-1].items():
@@ -66,11 +72,11 @@ class HMMTagger(object):
                                 + self.log_word_probability(word, tag)
                         
                         # Increasing the alpha
-                        new_state = previous_state[1:] + (tag,)
-                        new_stage[new_state].log_inc_alpha(log_alpha_inc)
+                        next_state = previous_state[1:] + (tag,)
+                        next_stage[next_state].log_inc_alpha(log_alpha_inc)
 
                 # Adding the new stage to the list
-                stages.append(new_stage)
+                stages.append(next_stage)
 
 
             # Compute backward probabilities (betas)
@@ -94,6 +100,9 @@ class HMMTagger(object):
 
                         node.log_inc_beta(log_beta_inc)
             
+            #for stage in stages:
+            #    data_log_prob = log_sum(node.log_alpha + node.log_beta for node in stage.values())
+            #    print("Data log probability:", data_log_prob, file=sys.stderr)
             data_log_prob = log_sum(node.log_alpha for node in stages[-1].values())
             print("Data log probability: %s" % data_log_prob, file=sys.stderr)
 
@@ -119,6 +128,10 @@ class HMMTagger(object):
             # Update new parameters
             self.output_probs.update(output_probs)
             self.transition_probs.update(transition_probs)
+            self.known_words = set(unlabeled_data)
+
+            if last_data_log_prob is not None and abs(last_data_log_prob - data_log_prob) < 1:
+                print("Last iteration, convergence condition met.", file=sys.stderr)
 
     def train_lambdas(self, sentences):
         held_out_data = list(self.concat_labeled_sentences(sentences))
@@ -228,6 +241,15 @@ class HMMTagger(object):
     def tagset_size(self):
         return len(self.tag_lexicon)
 
+    def log_word_probability(self, word, tag):
+        try:
+            if word in self.known_words:
+                return self.output_probs[tag].log_probability(word)
+            else:
+                return -log2(self.vocabulary_size())
+        except KeyError:
+            return -log2(self.vocabulary_size())
+    
     def log_tag_probability(self, tag, tag_history):
         logs = []
         for lambda_coeff, suffix in safe_zip(self.lambdas[:-1], suffixes(tag_history)):
@@ -237,16 +259,10 @@ class HMMTagger(object):
     
     def log_n_tag_probability(self, tag, suffix):
         try:
-            self.transition_probs[suffix].log_probability(tag)
+            return self.transition_probs[suffix].log_probability(tag)
         except KeyError:
             return -log2(self.tagset_size())
 
-    def log_word_probability(self, word, tag):
-        try:
-            return self.output_probs[tag].log_probability(word)
-        except KeyError:
-            return -log2(self.vocabulary_size())
-    
     def start_state(self):
         return (self.n - 1) * (None,)
 

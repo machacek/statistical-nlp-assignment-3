@@ -39,7 +39,7 @@ def parse_args():
 def main():
     args = parse_args()
     tagger = HMMTagger(n=3)
-    tagger.train_parameters(args.train)
+    tagger.train_labeled(args.train)
     if args.heldout:
         tagger.train_lambdas(args.heldout)
     if args.unlabeled:
