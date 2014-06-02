@@ -277,7 +277,7 @@ class HMMTagger(object):
             try:
                 return self.c_ht[suffix, tag] / self.c_h[suffix] 
             except ZeroDivisionError:
-                return 1/self.vocabulary_size()
+                return 1/len(self.tag_lexicon)
 
     def word_probability(self, word, tag):
         try:
