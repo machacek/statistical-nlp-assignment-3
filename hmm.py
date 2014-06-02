@@ -20,6 +20,9 @@ class HMMTagger(object):
         train_data = list(self.concat_labeled_sentences(sentences))
         words = [word for word, tag in train_data]
         tags = [tag for word, tag in train_data]
+        
+        # Debug output
+        print("\nLearning MLE parameters from labeled data (%s tokens)" % len(words), file=sys.stderr)
 
         transition_probs = defaultdict(Distribution)
         output_probs = defaultdict(Distribution)
@@ -43,11 +46,11 @@ class HMMTagger(object):
     def train_unlabeled(self, unlabeled_sentences):
         unlabeled_data = list(self.concat_unlabeled_sentences(unlabeled_sentences))
 
-        max_iteration = 15
+        max_iteration = 5
         
         # Debug output
-        print("Starting Forward-Backward algorithm", file=sys.stderr)
-        print("Algorithm ends when max number of iteration reached (%s) or convergence condition is met" % max_iteration, file=sys.stderr)
+        print("\nStarting Forward-Backward algorithm, unsupervised learning on unlabeled data (%s tokens)" % len(unlabeled_data), file=sys.stderr)
+        print("The algorithm ends when max number of iteration reached (%s) or convergence condition is met" % max_iteration, file=sys.stderr)
 
         last_data_log_prob = None
 

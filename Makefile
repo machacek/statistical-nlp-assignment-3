@@ -3,7 +3,7 @@ SHELL = /bin/bash
 BRILL_DIR = $(shell first_existing /home/mmachace/RULE_BASED_TAGGER_V1.14 /home/machacek/RULE_BASED_TAGGER_V1.14)
 BRILL_TAGGER = $(BRILL_DIR)/Bin_and_Data/tagger
 
-TRAIN_SIZE = 10000000
+TRAIN_SIZE = 100000
 
 .PHONY: all clean
 
@@ -57,14 +57,17 @@ all: en.hmm-supervised.results cz.hmm-supervised.results
 %.S.hmm-unsupervised.tagged: %.S.untagged %.hmm-unsupervised.model
 	cat $< | ./decode $*.hmm-unsupervised.model > $@
 
-%.hmm-unsupervised.model: %.T.labeled.spl %.T.unlabeled.spl
-	./train-model-hmm $< --unlabeled $*.T.unlabeled.spl > $@
+%.hmm-unsupervised.model: %.T.labeled.spl %.T.unlabeled.spl %.H.spl
+	./train-model-hmm $< \
+		--unlabeled $*.T.unlabeled.spl \
+		--heldout $*.H.spl \
+		> $@
 
 %.T.labeled.spl: %.T.spl
-	cat $< | head -n1000 > $@
+	cat $< | head -n400 > $@
 
 %.T.unlabeled.spl: %.T.spl
-	cat $< | tail -n+1001 | head -n1000 | ./remove-tags > $@
+	cat $< | tail -n+400 | head -n100 | ./remove-tags > $@
 
 #########################################################
 # Brill's tagger experiment                             #

@@ -40,10 +40,10 @@ def main():
     args = parse_args()
     tagger = HMMTagger(n=3)
     tagger.train_labeled(args.train)
-    if args.heldout:
-        tagger.train_lambdas(args.heldout)
     if args.unlabeled:
         tagger.train_unlabeled(args.unlabeled)
+    if args.heldout:
+        tagger.train_lambdas(args.heldout)
     pickle.dump(tagger, args.model)
 
 if __name__ == '__main__':
