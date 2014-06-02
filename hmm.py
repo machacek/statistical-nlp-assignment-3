@@ -10,41 +10,37 @@ class HMMTagger(object):
     def __init__(self, n=3):
         self.n = n 
         self.lambdas = (n+1) * (1/(n+1),) # pocatecni parametry vylazovani, pozor, parametry jsou v obracenem poradi
-        self.c_tw = Counter() # pocet videnycn dvojic tag, slovo (c_wt ze slidu)
-        self.c_t  = Counter() # pocet videnych tagu (c_t ze slidu)
-        self.c_h  = Counter() # pocet videnych historii tagu (c_t(n-1) ze slidu)
-        self.c_ht = Counter() # pocet videnych tag n-gramu (c_tn ze slidu) 
         self.word_lexicon = defaultdict(set)
         self.tag_lexicon = defaultdict(set)
+        self.transition_probs = dict()
+        self.output_probs = dict()
 
-    def concat_labeled_sentences(self, sentences):
-        first = True
-        for sentence in sentences:
-            if not first:
-                yield from [(None, None) for _ in self.start_state()]
-            first = False
-            yield from sentence
-    
-    def concat_unlabeled_sentences(self, sentences):
-        first = True
-        for sentence in sentences:
-            if not first:
-                yield from self.start_state()
-            first = False
-            yield from sentence
-
-    def train_parameters(self, sentences):
+    def train_labeled(self, sentences):
         train_data = list(self.concat_labeled_sentences(sentences))
         words = [word for word, tag in train_data]
         tags = [tag for word, tag in train_data]
-        for word, tag, tag_history in zip(words, tags, self.history_generator(tags)):
-            self.c_tw[tag,word] += 1
-            self.c_t[tag] += 1
-            for suffix in suffixes(tag_history):
-                self.c_h[suffix] += 1
-                self.c_ht[suffix, tag] += 1
+
+        transition_probs = defaultdict(Distribution)
+        output_probs = defaultdict(Distribution)
+
+        for word, tag, state in zip(words, tags, self.history_generator(tags)):
+            output_probs[tag].add_count(word, 1)
+            for history in suffixes(state):
+                transition_probs[history].add_count(tag, 1)
             self.word_lexicon[word].add(tag)
             self.tag_lexicon[tag].add(word)
+
+        # Smoothing output probabilities
+        # options:
+        #    - not do
+        #    * all possible pairs +1
+        #    - train lambdas like transition smoothing
+        for word in self.word_lexicon:
+            for tag in self.tag_lexicon:
+                output_probs[tag].add_count(word, 1)
+
+        self.transition_probs.update(transition_probs)
+        self.output_probs.update(output_probs)
     
     def train_unlabeled(self, unlabeled_sentences):
         unlabeled_data = list(self.concat_unlabeled_sentences(unlabeled_sentences))
@@ -53,10 +49,8 @@ class HMMTagger(object):
         for i in range(10):
             print("\nForward-Backward algorithm - iteration %s" % i, file=sys.stderr)
 
-            tag_word_counts = defaultdict(negative_infinity)
-            tag_counts = defaultdict(negative_infinity)
-            history_tag_counts = defaultdict(negative_infinity)
-            history_counts = defaultdict(negative_infinity)
+            transition_probs = defaultdict(Distribution)
+            output_probs = defaultdict(Distribution)
 
             # Compute forward probabilities (alphas)
             print("Computing forward probabilities", file=sys.stderr)
@@ -100,7 +94,8 @@ class HMMTagger(object):
 
                         node.log_inc_beta(log_beta_inc)
             
-            
+            data_log_prob = log_sum(node.log_alpha for node in stages[-1].values())
+            print("Data log probability: %s" % data_log_prob, file=sys.stderr)
 
             # Accumulate the counts
             print("Accumulating counts", file=sys.stderr)
@@ -110,31 +105,24 @@ class HMMTagger(object):
                         state = previous_state[1:] + (tag,)
                         node = stages[t][state]
                         
-                        log_expected_count_inc = \
+                        log_expected_count = \
                                   previous_node.log_alpha \
                                 + self.log_tag_probability(tag, previous_state) \
                                 + self.log_word_probability(word, tag) \
                                 + node.log_beta
 
-                        tag_word_counts[tag,word] = log_add(tag_word_counts[tag,word], log_expected_count_inc)
-                        tag_counts[tag] = log_add(tag_counts[tag], log_expected_count_inc)
+                        output_probs[tag].add_log_count(word, log_expected_count)
 
-                        history = previous_state
-                        for suffix in suffixes(history):
-                            history_tag_counts[suffix, tag] = log_add(history_tag_counts[suffix, tag], log_expected_count_inc)
-                            history_counts[suffix] = log_add(history_counts[suffix], log_expected_count_inc)
-            
-            data_log_prob = log_sum(node.log_alpha for node in stages[-1].values())
-            print("Data log probability: %s" % data_log_prob, file=sys.stderr)
+                        for history in suffixes(previous_state):
+                            transition_probs[history].add_log_count(tag, log_expected_count)
 
-            # Substitute current counts
-            self.tag_word_counts = tag_word_counts
-            self.tag_counts = tag_counts
-            self.history_tag_counts = history_tag_counts
-            self.history_counts = history_counts
+            # Update new parameters
+            self.output_probs.update(output_probs)
+            self.transition_probs.update(transition_probs)
 
     def train_lambdas(self, sentences):
         held_out_data = list(self.concat_labeled_sentences(sentences))
+        tags = [tag for word,tag in held_out_data]
         
         epsilon = 0.001
 
@@ -147,22 +135,23 @@ class HMMTagger(object):
         iteration = 0
         while not done:
             iteration += 1
-            print("\n\nStarting iteration %s" % iteration, file=sys.stderr)
+            print("\nStarting iteration %s" % iteration, file=sys.stderr)
 
             # Prepare list of lambda multiplicators
-            lambdas = [0 for _ in self.lambdas]
+            logs = [negative_infinity() for _ in self.lambdas]
 
-            tags = [tag for word,tag in held_out_data]
             for tag, tag_history in zip(tags, self.history_generator(tags)):
-                interpolated_prob = self.tag_probability(tag, tag_history)
+                log_interpolated_prob = self.log_tag_probability(tag, tag_history)
                 for i, suffix in enumerate(suffixes(tag_history)):
-                    lambdas[i] += self.n_tag_probability(tag, suffix) / interpolated_prob
-                lambdas[-1] +=  1 / (self.vocabulary_size() * interpolated_prob)
+                    addition = self.log_n_tag_probability(tag, suffix) - log_interpolated_prob
+                    logs[i] = log_add(logs[i], addition)
+                addition = -log2(self.vocabulary_size) - log_interpolated_prob
+                logs[-1] = log_add(logs[-1], addition)
             
             # Multiply with old lambdas and normalize
-            lambdas = [lambda_ * lambda_mul for lambda_, lambda_mul in zip(self.lambdas, lambdas)]
-            sum_ = sum(lambdas)
-            lambdas = [lambda_ / sum_ for lambda_ in lambdas]
+            logs = [log2(lambda_) + log for lambda_, log in zip(self.lambdas, logs)]
+            log_sum_ = log_sum(logs)
+            lambdas = [ 2**(log - log_sum_) for log in logs]
 
             # Check if some parameter change significantly and continue in next iteration
             done = True
@@ -233,24 +222,31 @@ class HMMTagger(object):
         else:
             return self.tag_lexicon.keys()
 
-    def vocabulary_size(self, tag=None):
-        if tag is None:
-            return len(self.word_lexicon)
-        else:
-            return len(self.tag_lexicon[tag])
+    def vocabulary_size(self):
+        return len(self.word_lexicon)
+
+    def tagset_size(self):
+        return len(self.tag_lexicon)
 
     def log_tag_probability(self, tag, tag_history):
+        logs = []
+        for lambda_coeff, suffix in safe_zip(self.lambdas[:-1], suffixes(tag_history)):
+            logs.append(log2(lambda_coeff) + self.log_n_tag_probability(tag, suffix))
+        logs.append(log2(self.lambdas[-1]) - log2(self.tagset_size()))
+        return log_sum(logs)
+    
+    def log_n_tag_probability(self, tag, suffix):
         try:
-            return log2(self.tag_probability(tag, tag_history))
-        except ValueError:
-            return float('-inf')
+            self.transition_probs[suffix].log_probability(tag)
+        except KeyError:
+            return -log2(self.tagset_size())
 
     def log_word_probability(self, word, tag):
         try:
-            return log2(self.word_probability(word, tag))
-        except ValueError:
-            return float('-inf')
-
+            return self.output_probs[tag].log_probability(word)
+        except KeyError:
+            return -log2(self.vocabulary_size())
+    
     def start_state(self):
         return (self.n - 1) * (None,)
 
@@ -263,28 +259,43 @@ class HMMTagger(object):
             n_gram.popleft()
             n_gram.append(new_item)
     
-    def tag_probability(self, tag, tag_history):
-        sum = 0
-        for lambda_coeff, suffix in safe_zip(self.lambdas[:-1], suffixes(tag_history)):
-            sum += lambda_coeff * self.n_tag_probability(tag, suffix)
-        sum += self.lambdas[-1] / self.vocabulary_size()
-        return sum
+    def concat_labeled_sentences(self, sentences):
+        first = True
+        for sentence in sentences:
+            if not first:
+                yield from [(None, None) for _ in self.start_state()]
+            first = False
+            yield from sentence
+    
+    def concat_unlabeled_sentences(self, sentences):
+        first = True
+        for sentence in sentences:
+            if not first:
+                yield from self.start_state()
+            first = False
+            yield from sentence
 
-    def n_tag_probability(self, tag, suffix):
-        try:
-            return 2**(self.history_tag_counts[suffix, tag] - self.history_counts[suffix])
-        except AttributeError:
-            try:
-                return self.c_ht[suffix, tag] / self.c_h[suffix] 
-            except ZeroDivisionError:
-                return 1/len(self.tag_lexicon)
+class Distribution(object):
+    __slots__ = ("log_total", "log_counts")
+    def __init__(self):
+        self.log_counts = defaultdict(negative_infinity)
+        self.log_total = negative_infinity()
 
-    def word_probability(self, word, tag):
-        try:
-            return 2**(self.tag_word_counts[tag,word] - self.tag_counts[tag])
-        except AttributeError:
-            return (self.c_tw[tag, word] + 1) / (self.c_t[tag] + self.vocabulary_size())
+    def add_count(self, item, count):
+        self.add_log_count(item, log2(count))
 
+    def add_log_count(self, item, log_count):
+        self.log_counts[item] = log_add(self.log_counts[item], log_count)
+        self.log_total = log_add(self.log_total, log_count)
+
+    def log_probability(self, item):
+        if self.log_total == negative_infinity():
+            # For sure
+            raise KeyError("The condition was not seen")
+        return self.log_counts[item] - self.log_total
+
+    def probability(self, item):
+        return 2**self.log_probability(item)
                 
 class ViterbiTrelisNode(object):
     __slots__ = ["log_gamma", "previous_node", "tag"]
