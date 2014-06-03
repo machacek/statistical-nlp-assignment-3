@@ -3,20 +3,19 @@ SHELL = /bin/bash
 BRILL_DIR = $(shell first_existing /home/mmachace/RULE_BASED_TAGGER_V1.14 /home/machacek/RULE_BASED_TAGGER_V1.14)
 BRILL_TAGGER = $(BRILL_DIR)/Bin_and_Data/tagger
 
-TRAIN_SIZE = 100000
+TRAIN_SIZE = 20000
 
 .PHONY: all clean
 
 .SECONDARY:
 
-#all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-supervised.results 
-all: en.hmm-supervised.results cz.hmm-supervised.results 
+all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-supervised.results en.hmm-unsupervised.results cz.hmm-unsupervised.results en.brill.results cz.brill.results
 
 #########################################################
 # Baseline experiment                                   #
 #########################################################
 
-%.baseline.results: %.fold1.S.baseline.accuracy
+%.baseline.results: %.fold1.S.baseline.accuracy %.fold2.S.baseline.accuracy %.fold3.S.baseline.accuracy %.fold4.S.baseline.accuracy %.fold5.S.baseline.accuracy
 	./results-summary $^ > $@
 
 %.baseline.accuracy: %.baseline.tagged %.spl
@@ -32,7 +31,7 @@ all: en.hmm-supervised.results cz.hmm-supervised.results
 # Supervised HMM experiment                             #
 #########################################################
 
-%.hmm-supervised.results: %.fold1.S.hmm-supervised.accuracy
+%.hmm-supervised.results: %.fold1.S.hmm-supervised.accuracy %.fold2.S.hmm-supervised.accuracy %.fold3.S.hmm-supervised.accuracy %.fold4.S.hmm-supervised.accuracy %.fold5.S.hmm-supervised.accuracy
 	./results-summary $^ > $@
 
 %.hmm-supervised.accuracy: %.hmm-supervised.tagged %.spl
@@ -48,7 +47,7 @@ all: en.hmm-supervised.results cz.hmm-supervised.results
 # Unsupervised HMM experiment                           #
 #########################################################
 
-%.hmm-unsupervised.results: %.fold1.S.hmm-unsupervised.accuracy
+%.hmm-unsupervised.results: %.fold1.S.hmm-unsupervised.accuracy %.fold2.S.hmm-unsupervised.accuracy %.fold3.S.hmm-unsupervised.accuracy %.fold4.S.hmm-unsupervised.accuracy %.fold5.S.hmm-unsupervised.accuracy
 	./results-summary $^ > $@
 
 %.hmm-unsupervised.accuracy: %.hmm-unsupervised.tagged %.spl
@@ -67,7 +66,7 @@ all: en.hmm-supervised.results cz.hmm-supervised.results
 	cat $< | head -n400 > $@
 
 %.T.unlabeled.spl: %.T.spl
-	cat $< | tail -n+400 | head -n100 | ./remove-tags > $@
+	cat $< | tail -n+400 | ./remove-tags > $@
 
 #########################################################
 # Brill's tagger experiment                             #
