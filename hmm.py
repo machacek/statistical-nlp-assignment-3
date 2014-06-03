@@ -143,8 +143,8 @@ class HMMTagger(object):
         epsilon = 0.001
 
         # Debug output
-        print("Starting Smoothing EM Algorithm", file=sys.stderr)
-        print("Actual Lambdas:", self.lambdas, file=sys.stderr)
+        print("\nStarting Smoothing EM Algorithm", file=sys.stderr)
+        print("Actual Lambdas:", ' '.join(map(lambda x: "%.3f" % x, self.lambdas)), file=sys.stderr)
         print("Actual Cross Entropy:", self.tag_cross_entropy(held_out_data), file=sys.stderr)
 
         done = False
@@ -153,7 +153,6 @@ class HMMTagger(object):
             iteration += 1
             print("\nStarting iteration %s" % iteration, file=sys.stderr)
 
-            # Prepare list of lambda multiplicators
             logs = [negative_infinity() for _ in self.lambdas]
 
             for tag, tag_history in zip(tags, self.history_generator(tags)):
@@ -161,7 +160,7 @@ class HMMTagger(object):
                 for i, suffix in enumerate(suffixes(tag_history)):
                     addition = self.log_n_tag_probability(tag, suffix) - log_interpolated_prob
                     logs[i] = log_add(logs[i], addition)
-                addition = -log2(self.vocabulary_size) - log_interpolated_prob
+                addition = -log2(self.vocabulary_size()) - log_interpolated_prob
                 logs[-1] = log_add(logs[-1], addition)
             
             # Multiply with old lambdas and normalize
@@ -176,9 +175,9 @@ class HMMTagger(object):
                     done = False
 
             # Apply new Lambdas
-            self.lambdas = lambdas
+            self.lambdas = tuple(lambdas)
             
-            print("New Lambdas:", self.lambdas, file=sys.stderr)
+            print("New Lambdas:", ' '.join(map(lambda x: "%.3f" % x, self.lambdas)), file=sys.stderr)
             print("New Cross Entropy:", self.tag_cross_entropy(held_out_data), file=sys.stderr)
 
         print("End of EM Smoothing Algorithm", file=sys.stderr)
