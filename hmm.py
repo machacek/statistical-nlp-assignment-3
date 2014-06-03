@@ -63,7 +63,7 @@ class HMMTagger(object):
 
             # Compute forward probabilities (alphas)
             print("Computing forward probabilities", file=sys.stderr)
-            stages = [{ self.start_state() : ForwardBackwardTrelisNode(log_alpha=0) }]
+            stages = [{ self.start_state() : ForwardBackwardTrelisNode(log_alpha=0) }] # Initialization step
             for word in unlabeled_data:
                 next_stage = defaultdict(ForwardBackwardTrelisNode)
                 
@@ -84,7 +84,7 @@ class HMMTagger(object):
 
             # Compute backward probabilities (betas)
             print("Computing backward probabilities", file=sys.stderr)
-            for node in stages[-1].values():
+            for node in stages[-1].values(): # Initialization step
                 node.log_beta=0
             for t, word in reversed(list(enumerate(unlabeled_data))):
                 current_stage = stages[t]
@@ -101,11 +101,10 @@ class HMMTagger(object):
                                 + self.log_word_probability(word, tag) \
                                 + self.log_tag_probability(tag, state)
 
+                        # Increasing beta
                         node.log_inc_beta(log_beta_inc)
             
-            #for stage in stages:
-            #    data_log_prob = log_sum(node.log_alpha + node.log_beta for node in stage.values())
-            #    print("Data log probability:", data_log_prob, file=sys.stderr)
+            # Computing probability of the data to check sanity
             data_log_prob = log_sum(node.log_alpha for node in stages[-1].values())
             print("Data log probability: %s" % data_log_prob, file=sys.stderr)
 
@@ -114,17 +113,20 @@ class HMMTagger(object):
             for t, word in enumerate(unlabeled_data, 1):
                 for tag in self.possible_tags(word):
                     for previous_state, previous_node in stages[t-1].items():
+                        
+                        # Getting the node in current stage 
                         state = previous_state[1:] + (tag,)
                         node = stages[t][state]
                         
+                        # Computing expected count
                         log_expected_count = \
                                   previous_node.log_alpha \
                                 + self.log_tag_probability(tag, previous_state) \
                                 + self.log_word_probability(word, tag) \
                                 + node.log_beta
 
+                        # Adding expected count
                         output_probs[tag].add_log_count(word, log_expected_count)
-
                         for history in suffixes(previous_state):
                             transition_probs[history].add_log_count(tag, log_expected_count)
 
@@ -219,7 +221,9 @@ class HMMTagger(object):
         while node.tag is not None:
             rev_tags.append(node.tag)
             node = node.previous_node
-        return list(zip(words,reversed(rev_tags)))
+
+        tags = list(reversed(rev_tags))
+        return list(zip(words,tags))
 
     def tag_cross_entropy(self, held_out_data):
         sum = 0
@@ -326,6 +330,8 @@ class ViterbiTrelisNode(object):
         if self.log_gamma is None or self.log_gamma < log_gamma:
             self.log_gamma = log_gamma
             self.previous_node = previous_node
+            if tag is None:
+                tag = "###"
             self.tag = tag
 
 class ForwardBackwardTrelisNode(object):

@@ -3,7 +3,7 @@ import sys
 import argparse
 import pickle
 from baseline import BaselineTagger
-from util import SPLReader
+from utils import SPLReader
 
 def parse_args():
     parser = argparse.ArgumentParser(
