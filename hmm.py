@@ -46,7 +46,7 @@ class HMMTagger(object):
     def train_unlabeled(self, unlabeled_sentences):
         unlabeled_data = list(self.concat_unlabeled_sentences(unlabeled_sentences))
 
-        max_iteration = 5
+        max_iteration = 15
         
         # Debug output
         print("\nStarting Forward-Backward algorithm, unsupervised learning on unlabeled data (%s tokens)" % len(unlabeled_data), file=sys.stderr)
