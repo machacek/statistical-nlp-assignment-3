@@ -66,7 +66,7 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 	cat $< | head -n10000 > $@
 
 %.T.unlabeled.ptg: %.T.ptg
-	cat $< | tail -n+10001 | ./remove-tags > $@
+	cat $< | tail -n+10001 | head -n 2000 | ./remove-tags > $@
 
 #########################################################
 # Brill's tagger experiment                             #

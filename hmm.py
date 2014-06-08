@@ -76,9 +76,6 @@ class HMMTagger(object):
                         state = previous_state[1:] + (tag,)
                         node =  stages[t][state]
                         
-                        #print("\nstate:", state, "previous_state:", previous_state)
-                        #print("node:", node, "previous_node:", previous_node)
-
                         # Increasing alpha
                         node.log_inc_alpha(
                                   previous_node.log_alpha
@@ -134,7 +131,8 @@ class HMMTagger(object):
             # Update new parameters
             self.output_probs.update(output_probs)
             self.transition_probs.update(transition_probs)
-            self.known_words = set(words)
+            #self.known_words = set(words)
+            self.known_words.update(set(words))
 
             if last_data_log_prob is not None and abs(last_data_log_prob - data_log_prob) < 1:
                 print("Last iteration, convergence condition met.", file=sys.stderr)
