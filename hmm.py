@@ -14,18 +14,18 @@ class HMMTagger(object):
         self.tag_lexicon = defaultdict(set)
         self.transition_probs = dict()
         self.output_probs = dict()
-        self.known_words = set()
 
     def train_labeled(self, labeled_data):
         labeled_data = list(labeled_data)
         words = [word for word, tag in labeled_data]
         tags = [tag for word, tag in labeled_data]
+        known_words = frozenset(words)
         
         # Debug output
         print("\nLearning MLE parameters from labeled data (%s tokens)" % len(words), file=sys.stderr)
 
         transition_probs = defaultdict(Distribution)
-        output_probs = defaultdict(Distribution)
+        output_probs = defaultdict(lambda: Distribution(known_items=known_words))
 
         for word, tag, state in zip(words, tags, self.history_generator(tags)):
             output_probs[tag].add_count(word, 1)
@@ -41,13 +41,13 @@ class HMMTagger(object):
 
         self.transition_probs.update(transition_probs)
         self.output_probs.update(output_probs)
-        self.known_words = set(self.word_lexicon)
 
     
     def train_unlabeled(self, words):
         words = list(words)
         T = len(words)
-        max_iteration = 2
+        max_iteration = 15
+        known_words = frozenset(words)
         
         # Debug output
         print("\nStarting Forward-Backward algorithm, unsupervised learning on unlabeled data (%s tokens)" % len(words), file=sys.stderr)
@@ -60,7 +60,7 @@ class HMMTagger(object):
             print("\nForward-Backward algorithm - iteration %s" % i, file=sys.stderr)
 
             transition_probs = defaultdict(Distribution)
-            output_probs = defaultdict(Distribution)
+            output_probs = defaultdict(lambda: Distribution(known_items=known_words))
             
             stages = [defaultdict(ForwardBackwardTrelisNode) for _ in range(T+1)]
 
@@ -131,8 +131,6 @@ class HMMTagger(object):
             # Update new parameters
             self.output_probs.update(output_probs)
             self.transition_probs.update(transition_probs)
-            #self.known_words = set(words)
-            self.known_words.update(set(words))
 
             if last_data_log_prob is not None and abs(last_data_log_prob - data_log_prob) < 1:
                 print("Last iteration, convergence condition met.", file=sys.stderr)
@@ -249,10 +247,7 @@ class HMMTagger(object):
 
     def log_word_probability(self, word, tag):
         try:
-            if word in self.known_words:
-                return self.output_probs[tag].log_probability(word)
-            else:
-                return -log2(self.vocabulary_size())
+            return self.output_probs[tag].log_probability(word)
         except KeyError:
             return -log2(self.vocabulary_size())
     
@@ -298,10 +293,11 @@ class HMMTagger(object):
             yield from sentence
 
 class Distribution(object):
-    __slots__ = ("log_total", "log_counts")
-    def __init__(self):
+    __slots__ = ("log_total", "log_counts", "known_items")
+    def __init__(self, known_items=None):
         self.log_counts = defaultdict(negative_infinity)
         self.log_total = negative_infinity()
+        self.known_items = known_items
 
     def add_count(self, item, count):
         self.add_log_count(item, log2(count))
@@ -314,7 +310,10 @@ class Distribution(object):
         if self.log_total == negative_infinity():
             # For sure
             raise KeyError("The condition was not seen")
-        return self.log_counts[item] - self.log_total
+        if self.known_items is None or item in self.known_items:
+            return self.log_counts[item] - self.log_total
+        else:
+            return -log2(len(self.known_items))
 
     def probability(self, item):
         return 2**self.log_probability(item)
