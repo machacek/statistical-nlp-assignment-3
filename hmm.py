@@ -42,70 +42,68 @@ class HMMTagger(object):
         self.transition_probs.update(transition_probs)
         self.output_probs.update(output_probs)
         self.known_words = set(self.word_lexicon)
-    
-    def train_unlabeled(self, unlabeled_data):
-        unlabeled_data = list(unlabeled_data)
 
-        max_iteration = 15
+    
+    def train_unlabeled(self, words):
+        words = list(words)
+        T = len(words)
+        max_iteration = 2
         
         # Debug output
-        print("\nStarting Forward-Backward algorithm, unsupervised learning on unlabeled data (%s tokens)" % len(unlabeled_data), file=sys.stderr)
+        print("\nStarting Forward-Backward algorithm, unsupervised learning on unlabeled data (%s tokens)" % len(words), file=sys.stderr)
         print("The algorithm ends when max number of iteration reached (%s) or convergence condition is met" % max_iteration, file=sys.stderr)
 
+
         last_data_log_prob = None
-
-        T = len(unlabeled_data)
-
         # Forward-Backward algorithm
         for i in range(1, max_iteration + 1):
             print("\nForward-Backward algorithm - iteration %s" % i, file=sys.stderr)
 
             transition_probs = defaultdict(Distribution)
             output_probs = defaultdict(Distribution)
+            
+            stages = [defaultdict(ForwardBackwardTrelisNode) for _ in range(T+1)]
 
             # Compute forward probabilities (alphas)
             print("Computing forward probabilities", file=sys.stderr)
-            #stages = [ defaultdict(ForwardBackwardTrelisNode) for 
-            stages = [{ self.start_state() : ForwardBackwardTrelisNode(log_alpha=0) }] # Initialization step
-            for word in unlabeled_data:
-                next_stage = defaultdict(ForwardBackwardTrelisNode)
-                
+            stages[0][self.start_state()] = ForwardBackwardTrelisNode(log_alpha=0)
+            for t, word in enumerate(words, 1):
                 for tag in self.possible_tags(word):
-                    for previous_state, previous_node in stages[-1].items():
-                        # Computint alpha increase
-                        log_alpha_inc = previous_node.log_alpha \
-                                + self.log_tag_probability(tag, previous_state) \
-                                + self.log_word_probability(word, tag)
+                    for previous_state, previous_node in stages[t-1].items():
+
                         
-                        # Increasing the alpha
-                        next_state = previous_state[1:] + (tag,)
-                        next_stage[next_state].log_inc_alpha(log_alpha_inc)
+                        # Getting a stage node for given tag, to which there is an edge from previous node
+                        state = previous_state[1:] + (tag,)
+                        node =  stages[t][state]
+                        
+                        #print("\nstate:", state, "previous_state:", previous_state)
+                        #print("node:", node, "previous_node:", previous_node)
 
-                # Adding the new stage to the list
-                stages.append(next_stage)
-
+                        # Increasing alpha
+                        node.log_inc_alpha(
+                                  previous_node.log_alpha
+                                + self.log_tag_probability(tag, previous_state)
+                                + self.log_word_probability(word, tag)
+                                )
 
             # Compute backward probabilities (betas)
             print("Computing backward probabilities", file=sys.stderr)
             for node in stages[-1].values(): # Initialization step
                 node.log_beta=0
-            for t, word in reversed(list(enumerate(unlabeled_data))):
-                current_stage = stages[t]
-                next_stage = stages[t+1]
+            for t, word in reversed(list(enumerate(words))):
                 for tag in self.possible_tags(word):
-                    for state, node in current_stage.items():
+                    for state, node in stages[t].items():
 
                         # Getting next stage node for given tag, to which there is an edge from actual node
                         next_state = state[1:] + (tag,)
-                        next_node = next_stage[next_state]
-
-                        # Computing beta increase
-                        log_beta_inc = next_node.log_beta \
-                                + self.log_word_probability(word, tag) \
-                                + self.log_tag_probability(tag, state)
+                        next_node = stages[t+1][next_state]
 
                         # Increasing beta
-                        node.log_inc_beta(log_beta_inc)
+                        node.log_inc_beta(
+                                  next_node.log_beta
+                                + self.log_word_probability(word, tag)
+                                + self.log_tag_probability(tag, state)
+                                )
             
             # Computing probability of the data to check sanity
             data_log_prob = log_sum(node.log_alpha for node in stages[-1].values())
@@ -113,7 +111,7 @@ class HMMTagger(object):
 
             # Accumulate the counts
             print("Accumulating counts", file=sys.stderr)
-            for t, word in enumerate(unlabeled_data, 1):
+            for t, word in enumerate(words, 1):
                 for tag in self.possible_tags(word):
                     for previous_state, previous_node in stages[t-1].items():
                         
@@ -136,10 +134,13 @@ class HMMTagger(object):
             # Update new parameters
             self.output_probs.update(output_probs)
             self.transition_probs.update(transition_probs)
-            self.known_words = set(unlabeled_data)
+            self.known_words = set(words)
 
             if last_data_log_prob is not None and abs(last_data_log_prob - data_log_prob) < 1:
                 print("Last iteration, convergence condition met.", file=sys.stderr)
+                break
+            else:
+                last_data_log_prob = data_log_prob
 
     def train_lambdas(self, held_out_data):
         held_out_data = list(held_out_data)
@@ -319,6 +320,13 @@ class Distribution(object):
 
     def probability(self, item):
         return 2**self.log_probability(item)
+
+    def __repr__(self):
+        lines = ["Distribution(log_total=%s, total=%s" %(self.log_total, 2**self.log_total)]
+        for item in sorted(self.log_counts):
+            lines.append("	%s : log_count=%s, count=%s, prob=%s" % (item, self.log_counts[item], 2**self.log_counts[item], self.probability(item)))
+        lines.append(")")
+        return "\n".join(lines)
                 
 class ViterbiTrelisNode(object):
     __slots__ = ["log_gamma", "previous_node", "tag"]
@@ -346,9 +354,14 @@ class ForwardBackwardTrelisNode(object):
     
     def log_inc_beta(self, log_beta_addition):
         self.log_beta = log_add(self.log_beta, log_beta_addition)
+    
+    def __repr__(self):
+        return "ForwardBackwardTrelisNode(log_alpha=%.3f, alpha=%.3f, log_beta=%.3f, beta=%.3f)" %(self.log_alpha, 2**self.log_alpha, self.log_beta, 2**self.log_beta)
 
-def closed_range(n):
-    return range(n+1)
+def closed_range(*args):
+    args = list(args)
+    args[-1] += 1
+    return range(*args)
 
 def negative_infinity():
     return float('-inf')

@@ -17,8 +17,6 @@ def parse_args():
     
     parser.add_argument("model",
             help="A file where the created model will be stored. Omit for stdout.",
-            nargs='?',
-            default=sys.stdout.buffer,
             type=argparse.FileType('wb'),
             )
     

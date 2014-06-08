@@ -25,7 +25,7 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 	cat $< | ./remove-tags | ./decode $*.baseline.model > $@
 
 %.baseline.model: %.T.ptg
-	./train-model-baseline $< > $@
+	./train-model-baseline $< $@
 
 #########################################################
 # Supervised HMM experiment                             #
@@ -41,7 +41,7 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 	cat $< | ./remove-tags | ./decode $*.hmm-supervised.model > $@
 
 %.hmm-supervised.model: %.T.ptg %.H.ptg
-	./train-model-hmm $< --heldout $*.H.ptg > $@
+	./train-model-hmm $< --heldout $*.H.ptg $@
 
 #########################################################
 # Unsupervised HMM experiment                           #
@@ -60,7 +60,7 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 	./train-model-hmm $< \
 		--unlabeled $*.T.unlabeled.ptg \
 		--heldout $*.H.ptg \
-		> $@
+		$@
 
 %.T.labeled.ptg: %.T.ptg
 	cat $< | head -n10000 > $@
