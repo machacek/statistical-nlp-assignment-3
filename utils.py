@@ -1,6 +1,6 @@
 import sys
 
-class SPLReader(object):
+class LabeledReader(object):
     def __init__(self, filename):
         if filename == '-':
             self.file = sys.stdin
@@ -9,13 +9,13 @@ class SPLReader(object):
 
     def __iter__(self):
         for line in self.file:
-            yield [item.split('/',2) for item in line.split()]
+            yield tuple(line.strip().split('/',2))
 
     def __del__(self):
         if self.file is not sys.stdin:
             self.file.close()
 
-class SentenceReader(object):
+class UnlabeledReader(object):
     def __init__(self, filename):
         if filename == '-':
             self.file = sys.stdin
@@ -24,7 +24,7 @@ class SentenceReader(object):
 
     def __iter__(self):
         for line in self.file:
-            yield line.split()
+            yield line.strip()
 
     def __del__(self):
         if self.file is not sys.stdin:

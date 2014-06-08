@@ -6,11 +6,10 @@ class BaselineTagger(object):
         self.lexicon = defaultdict(Counter)
         self.all_tags = Counter()
 
-    def train_parameters(self, train_data):
-        for sentence in train_data:
-            for word, tag in sentence:
-                self.lexicon[word][tag] += 1
-                self.all_tags[tag] += 1
+    def train_labeled(self, labeled_data):
+        for word, tag in labeled_data:
+            self.lexicon[word][tag] += 1
+            self.all_tags[tag] += 1
         self.finalize()
 
     def finalize(self):
@@ -23,11 +22,7 @@ class BaselineTagger(object):
         del self.all_tags
 
     def decode(self, data):
-        for sentence in data:
-            yield list(self.decode_sentence(sentence))
-
-    def decode_sentence(self, sentence):
-        for word in sentence:
+        for word in data:
             try:
                 yield word, self.words_tags[word]
             except KeyError:

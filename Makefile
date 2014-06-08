@@ -18,13 +18,13 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 %.baseline.results: %.fold1.S.baseline.accuracy %.fold2.S.baseline.accuracy %.fold3.S.baseline.accuracy %.fold4.S.baseline.accuracy %.fold5.S.baseline.accuracy
 	./results-summary $^ > $@
 
-%.baseline.accuracy: %.baseline.tagged %.spl
+%.S.baseline.accuracy: %.S.baseline.tagged %.S.ptg
 	./measure-accuracy $^ > $@
 
-%.S.baseline.tagged: %.S.untagged %.baseline.model
-	cat $< | ./decode $*.baseline.model > $@
+%.S.baseline.tagged: %.S.ptg %.baseline.model
+	cat $< | ./remove-tags | ./decode $*.baseline.model > $@
 
-%.baseline.model: %.T.spl
+%.baseline.model: %.T.ptg
 	./train-model-baseline $< > $@
 
 #########################################################
@@ -34,14 +34,14 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 %.hmm-supervised.results: %.fold1.S.hmm-supervised.accuracy %.fold2.S.hmm-supervised.accuracy %.fold3.S.hmm-supervised.accuracy %.fold4.S.hmm-supervised.accuracy %.fold5.S.hmm-supervised.accuracy
 	./results-summary $^ > $@
 
-%.hmm-supervised.accuracy: %.hmm-supervised.tagged %.spl
+%.S.hmm-supervised.accuracy: %.S.hmm-supervised.tagged %.S.ptg
 	./measure-accuracy $^ > $@
 
-%.S.hmm-supervised.tagged: %.S.untagged %.hmm-supervised.model
-	cat $< | ./decode $*.hmm-supervised.model > $@
+%.S.hmm-supervised.tagged: %.S.ptg %.hmm-supervised.model
+	cat $< | ./remove-tags | ./decode $*.hmm-supervised.model > $@
 
-%.hmm-supervised.model: %.T.spl %.H.spl
-	./train-model-hmm $< --heldout $*.H.spl > $@
+%.hmm-supervised.model: %.T.ptg %.H.ptg
+	./train-model-hmm $< --heldout $*.H.ptg > $@
 
 #########################################################
 # Unsupervised HMM experiment                           #
@@ -50,23 +50,23 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 %.hmm-unsupervised.results: %.fold1.S.hmm-unsupervised.accuracy %.fold2.S.hmm-unsupervised.accuracy %.fold3.S.hmm-unsupervised.accuracy %.fold4.S.hmm-unsupervised.accuracy %.fold5.S.hmm-unsupervised.accuracy
 	./results-summary $^ > $@
 
-%.hmm-unsupervised.accuracy: %.hmm-unsupervised.tagged %.spl
+%.S.hmm-unsupervised.accuracy: %.S.hmm-unsupervised.tagged %.S.ptg
 	./measure-accuracy $^ > $@
 
-%.S.hmm-unsupervised.tagged: %.S.untagged %.hmm-unsupervised.model
-	cat $< | ./decode $*.hmm-unsupervised.model > $@
+%.S.hmm-unsupervised.tagged: %.S.ptg %.hmm-unsupervised.model
+	cat $< | ./remove-tags | ./decode $*.hmm-unsupervised.model > $@
 
-%.hmm-unsupervised.model: %.T.labeled.spl %.T.unlabeled.spl %.H.spl
+%.hmm-unsupervised.model: %.T.labeled.ptg %.T.unlabeled.ptg %.H.ptg
 	./train-model-hmm $< \
-		--unlabeled $*.T.unlabeled.spl \
-		--heldout $*.H.spl \
+		--unlabeled $*.T.unlabeled.ptg \
+		--heldout $*.H.ptg \
 		> $@
 
-%.T.labeled.spl: %.T.spl
-	cat $< | head -n400 > $@
+%.T.labeled.ptg: %.T.ptg
+	cat $< | head -n10000 > $@
 
-%.T.unlabeled.spl: %.T.spl
-	cat $< | tail -n+400 | ./remove-tags > $@
+%.T.unlabeled.ptg: %.T.ptg
+	cat $< | tail -n+10001 | ./remove-tags > $@
 
 #########################################################
 # Brill's tagger experiment                             #

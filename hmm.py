@@ -16,10 +16,10 @@ class HMMTagger(object):
         self.output_probs = dict()
         self.known_words = set()
 
-    def train_labeled(self, sentences):
-        train_data = list(self.concat_labeled_sentences(sentences))
-        words = [word for word, tag in train_data]
-        tags = [tag for word, tag in train_data]
+    def train_labeled(self, labeled_data):
+        labeled_data = list(labeled_data)
+        words = [word for word, tag in labeled_data]
+        tags = [tag for word, tag in labeled_data]
         
         # Debug output
         print("\nLearning MLE parameters from labeled data (%s tokens)" % len(words), file=sys.stderr)
@@ -43,8 +43,8 @@ class HMMTagger(object):
         self.output_probs.update(output_probs)
         self.known_words = set(self.word_lexicon)
     
-    def train_unlabeled(self, unlabeled_sentences):
-        unlabeled_data = list(self.concat_unlabeled_sentences(unlabeled_sentences))
+    def train_unlabeled(self, unlabeled_data):
+        unlabeled_data = list(unlabeled_data)
 
         max_iteration = 15
         
@@ -53,6 +53,8 @@ class HMMTagger(object):
         print("The algorithm ends when max number of iteration reached (%s) or convergence condition is met" % max_iteration, file=sys.stderr)
 
         last_data_log_prob = None
+
+        T = len(unlabeled_data)
 
         # Forward-Backward algorithm
         for i in range(1, max_iteration + 1):
@@ -63,6 +65,7 @@ class HMMTagger(object):
 
             # Compute forward probabilities (alphas)
             print("Computing forward probabilities", file=sys.stderr)
+            #stages = [ defaultdict(ForwardBackwardTrelisNode) for 
             stages = [{ self.start_state() : ForwardBackwardTrelisNode(log_alpha=0) }] # Initialization step
             for word in unlabeled_data:
                 next_stage = defaultdict(ForwardBackwardTrelisNode)
@@ -138,8 +141,8 @@ class HMMTagger(object):
             if last_data_log_prob is not None and abs(last_data_log_prob - data_log_prob) < 1:
                 print("Last iteration, convergence condition met.", file=sys.stderr)
 
-    def train_lambdas(self, sentences):
-        held_out_data = list(self.concat_labeled_sentences(sentences))
+    def train_lambdas(self, held_out_data):
+        held_out_data = list(held_out_data)
         tags = [tag for word,tag in held_out_data]
         
         epsilon = 0.001
@@ -188,12 +191,10 @@ class HMMTagger(object):
         for sentence in data:
             yield self.decode_sentence(sentence)
 
-    def decode_sentence(self, sentence):
-        words = list(sentence)
+    def decode(self, data):
+        words = list(data)
 
         max_number_of_states_in_stage = 50
-        
-        print("Decoding sentence", sentence, file=sys.stderr)
 
         # Viterbi algorithm
         stage = { self.start_state() : ViterbiTrelisNode(log_gamma=0) }
@@ -345,6 +346,9 @@ class ForwardBackwardTrelisNode(object):
     
     def log_inc_beta(self, log_beta_addition):
         self.log_beta = log_add(self.log_beta, log_beta_addition)
+
+def closed_range(n):
+    return range(n+1)
 
 def negative_infinity():
     return float('-inf')

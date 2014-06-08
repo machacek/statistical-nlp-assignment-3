@@ -3,7 +3,7 @@ import sys
 import argparse
 import pickle
 from baseline import BaselineTagger
-from utils import SPLReader
+from utils import LabeledReader
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -12,7 +12,7 @@ def parse_args():
     
     parser.add_argument("train",
             help="A file in spl format with training data, use '-' for stdin",
-            type=SPLReader,
+            type=LabeledReader,
             )
     
     parser.add_argument("model",
@@ -27,7 +27,7 @@ def parse_args():
 def main():
     args = parse_args()
     tagger = BaselineTagger()
-    tagger.train_parameters(args.train)
+    tagger.train_labeled(args.train)
     pickle.dump(tagger, args.model)
 
 if __name__ == '__main__':

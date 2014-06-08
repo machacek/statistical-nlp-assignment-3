@@ -2,7 +2,7 @@
 import sys
 import argparse
 import pickle
-from utils import SentenceReader
+from utils import UnlabeledReader
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -10,15 +10,15 @@ def parse_args():
         epilog="Author: Matous Machacek <machacekmatous@gmail.com>")
     
     parser.add_argument("model",
-            help="A file with model to be used to decode sentences.",
+            #help="A file with model to be used to decode sentences.",
             type=argparse.FileType('rb'),
             )
     
-    parser.add_argument("corpus",
-            help="A corpus to be decoded. It should be contain one tokenized sentence per line. Ommit or use '-' for stdin",
+    parser.add_argument("data",
+            #help="A corpus to be decoded. It should be contain one tokenized sentence per line. Ommit or use '-' for stdin",
             nargs='?',
-            default=SentenceReader('-'),
-            type=SentenceReader,
+            default=UnlabeledReader('-'),
+            type=UnlabeledReader,
             )
 
     return parser.parse_args()
@@ -26,8 +26,8 @@ def parse_args():
 def main():
     args = parse_args()
     tagger = pickle.load(args.model)
-    for decoded_sentence in tagger.decode(args.corpus):
-        print(*["%s/%s" % (word,tag) for word, tag in decoded_sentence])
+    for word, tag in tagger.decode(args.data):
+        print("%s/%s" % (word,tag))
 
 if __name__ == '__main__':
     main()

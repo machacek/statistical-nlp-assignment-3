@@ -3,7 +3,7 @@ import sys
 import argparse
 import pickle
 from hmm import HMMTagger
-from utils import SPLReader, SentenceReader
+from utils import UnlabeledReader, LabeledReader
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -12,7 +12,7 @@ def parse_args():
     
     parser.add_argument("train",
             help="A labeled file with training data.",
-            type=SPLReader,
+            type=LabeledReader,
             )
     
     parser.add_argument("model",
@@ -24,13 +24,13 @@ def parse_args():
     
     parser.add_argument("--heldout",
             help="A labeled file with heldout data used to train lambda parameters (linear interpolation smoothing).",
-            type=SPLReader,
+            type=LabeledReader,
             default=None,
             )
     
     parser.add_argument("--unlabeled",
             help="An unlabeled file for unsupervised learning.",
-            type=SentenceReader,
+            type=UnlabeledReader,
             default=None,
             )    
 
