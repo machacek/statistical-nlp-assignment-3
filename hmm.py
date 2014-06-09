@@ -1,19 +1,37 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3 -u
 from collections import namedtuple, Counter, defaultdict, deque
 from math import log2
 from itertools import zip_longest
 from functools import reduce
 import sys
 import heapq
+import re
+
+MAX_BW_ITERATIONS = 15
+MAX_NODES_STAGE = 50
+EPSILON = 0.001
+MAX_UNKNOWN_WORD_TAGS = 40
+CZECH_CLOSED_CLASSES = [
+        r'^###',
+        r'^I',
+        r'^J',
+        r'^P',
+        r'^R',
+        r'^T',
+        r'^X',
+        r'^Z',
+        r'^Vc',
+        ]
 
 class HMMTagger(object):
-    def __init__(self, n=3):
+    def __init__(self, n=3, language="en"):
         self.n = n 
         self.lambdas = (n+1) * (1/(n+1),) # pocatecni parametry vylazovani, pozor, parametry jsou v obracenem poradi
         self.word_lexicon = defaultdict(set)
         self.tag_lexicon = defaultdict(set)
         self.transition_probs = dict()
         self.output_probs = dict()
+        self.language = language
 
     def train_labeled(self, labeled_data):
         labeled_data = list(labeled_data)
@@ -42,22 +60,25 @@ class HMMTagger(object):
         self.transition_probs.update(transition_probs)
         self.output_probs.update(output_probs)
 
+        self.prepare_unknown_word_tags(tags)
+
+
     
     def train_unlabeled(self, words):
         words = list(words)
         T = len(words)
-        max_iteration = 15
         known_words = frozenset(words)
         
         # Debug output
         print("\nStarting Forward-Backward algorithm, unsupervised learning on unlabeled data (%s tokens)" % len(words), file=sys.stderr)
-        print("The algorithm ends when max number of iteration reached (%s) or convergence condition is met" % max_iteration, file=sys.stderr)
+        print("The algorithm ends when max number of iteration reached (%s) or convergence condition is met" % MAX_BW_ITERATIONS, file=sys.stderr)
+        sys.stderr.flush()
 
 
         last_data_log_prob = None
         # Forward-Backward algorithm
-        for i in range(1, max_iteration + 1):
-            print("\nForward-Backward algorithm - iteration %s" % i, file=sys.stderr)
+        for i in range(1, MAX_BW_ITERATIONS + 1):
+            print("\nForward-Backward algorithm - iteration %s" % i, file=sys.stderr); sys.stderr.flush()
 
             transition_probs = defaultdict(Distribution)
             output_probs = defaultdict(lambda: Distribution(known_items=known_words))
@@ -65,7 +86,7 @@ class HMMTagger(object):
             stages = [defaultdict(ForwardBackwardTrelisNode) for _ in range(T+1)]
 
             # Compute forward probabilities (alphas)
-            print("Computing forward probabilities", file=sys.stderr)
+            print("Computing forward probabilities", file=sys.stderr); sys.stderr.flush()
             stages[0][self.start_state()] = ForwardBackwardTrelisNode(log_alpha=0)
             for t, word in enumerate(words, 1):
                 for tag in self.possible_tags(word):
@@ -84,7 +105,7 @@ class HMMTagger(object):
                                 )
 
             # Compute backward probabilities (betas)
-            print("Computing backward probabilities", file=sys.stderr)
+            print("Computing backward probabilities", file=sys.stderr); sys.stderr.flush()
             for node in stages[-1].values(): # Initialization step
                 node.log_beta=0
             for t, word in reversed(list(enumerate(words))):
@@ -104,10 +125,10 @@ class HMMTagger(object):
             
             # Computing probability of the data to check sanity
             data_log_prob = log_sum(node.log_alpha for node in stages[-1].values())
-            print("Data log probability: %s" % data_log_prob, file=sys.stderr)
+            print("Data log probability: %s" % data_log_prob, file=sys.stderr); sys.stderr.flush()
 
             # Accumulate the counts
-            print("Accumulating counts", file=sys.stderr)
+            print("Accumulating counts", file=sys.stderr); sys.stderr.flush()
             for t, word in enumerate(words, 1):
                 for tag in self.possible_tags(word):
                     for previous_state, previous_node in stages[t-1].items():
@@ -132,28 +153,31 @@ class HMMTagger(object):
             self.output_probs.update(output_probs)
             self.transition_probs.update(transition_probs)
 
+            # Check the convergence condition
             if last_data_log_prob is not None and abs(last_data_log_prob - data_log_prob) < 1:
-                print("Last iteration, convergence condition met.", file=sys.stderr)
+                print("Last iteration, convergence condition met.", file=sys.stderr); sys.stderr.flush()
                 break
             else:
                 last_data_log_prob = data_log_prob
+            
+            # Flush the error stream so we know the progress
+            sys.stderr.flush()
 
     def train_lambdas(self, held_out_data):
         held_out_data = list(held_out_data)
         tags = [tag for word,tag in held_out_data]
         
-        epsilon = 0.001
 
         # Debug output
         print("\nStarting Smoothing EM Algorithm", file=sys.stderr)
         print("Actual Lambdas:", ' '.join(map(lambda x: "%.3f" % x, self.lambdas)), file=sys.stderr)
-        print("Actual Cross Entropy:", self.tag_cross_entropy(held_out_data), file=sys.stderr)
+        print("Actual Cross Entropy:", self.tag_cross_entropy(held_out_data), file=sys.stderr); sys.stderr.flush()
 
         done = False
         iteration = 0
         while not done:
             iteration += 1
-            print("\nStarting iteration %s" % iteration, file=sys.stderr)
+            print("\nStarting iteration %s" % iteration, file=sys.stderr); sys.stderr.flush()
 
             logs = [negative_infinity() for _ in self.lambdas]
 
@@ -173,16 +197,16 @@ class HMMTagger(object):
             # Check if some parameter change significantly and continue in next iteration
             done = True
             for old_lambda, new_lambda in zip(self.lambdas, lambdas):
-                if abs(old_lambda - new_lambda) > epsilon:
+                if abs(old_lambda - new_lambda) > EPSILON:
                     done = False
 
             # Apply new Lambdas
             self.lambdas = tuple(lambdas)
             
             print("New Lambdas:", ' '.join(map(lambda x: "%.3f" % x, self.lambdas)), file=sys.stderr)
-            print("New Cross Entropy:", self.tag_cross_entropy(held_out_data), file=sys.stderr)
+            print("New Cross Entropy:", self.tag_cross_entropy(held_out_data), file=sys.stderr); sys.stderr.flush()
 
-        print("End of EM Smoothing Algorithm", file=sys.stderr)
+        print("End of EM Smoothing Algorithm", file=sys.stderr); sys.stderr.flush()
 
     def decode(self, data):
         for sentence in data:
@@ -190,8 +214,6 @@ class HMMTagger(object):
 
     def decode(self, data):
         words = list(data)
-
-        max_number_of_states_in_stage = 50
 
         # Viterbi algorithm
         stage = { self.start_state() : ViterbiTrelisNode(log_gamma=0) }
@@ -210,7 +232,7 @@ class HMMTagger(object):
                     new_stage[state].update_node(log_gamma, previous_node, tag)
 
             # pruning
-            pruned = heapq.nlargest(max_number_of_states_in_stage, new_stage.items(), key=lambda x: x[1].log_gamma)
+            pruned = heapq.nlargest(MAX_NODES_STAGE, new_stage.items(), key=lambda x: x[1].log_gamma)
             stage = dict(pruned)
 
         # Backtrace the best tag path
@@ -237,7 +259,29 @@ class HMMTagger(object):
         if tags:
             return tags
         else:
-            return self.tag_lexicon.keys()
+            return self.unknown_word_tags
+
+    def prepare_unknown_word_tags(self, all_tags):
+        tags_counter = Counter(all_tags)
+        tags = list(tags_counter.keys())
+
+        # Delete closed class tags for Czech
+        if self.language == "en":
+            pass
+        elif self.language in ["cz","cs"]:
+            compiled = [re.compile(regexp) for regexp in CZECH_CLOSED_CLASSES]
+            for tag in tags:
+                if any(regexp.match(tag) for regexp in compiled):
+                    del tags_counter[tag]
+        else:
+            raise ValueError("Unknown language")
+
+        # Take only the most frequent tags
+        self.unknown_word_tags = [tag for tag, count in tags_counter.most_common(MAX_UNKNOWN_WORD_TAGS)]
+
+        print("\nNumber of all seen tags:", len(tags), file=sys.stderr)
+        print("Number of filtered tags for unknown words: %s (%.1f%%)" % (len(self.unknown_word_tags), 100 * len(self.unknown_word_tags) / len(tags)), file=sys.stderr); sys.stderr.flush()
+
 
     def vocabulary_size(self):
         return len(self.word_lexicon)

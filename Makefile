@@ -3,7 +3,7 @@ SHELL = /bin/bash
 BRILL_DIR = $(shell first_existing /home/mmachace/RULE_BASED_TAGGER_V1.14 /home/machacek/RULE_BASED_TAGGER_V1.14)
 BRILL_TAGGER = $(BRILL_DIR)/Bin_and_Data/tagger
 
-TRAIN_SIZE = 20000
+TRAIN_SIZE = 20000000000
 
 .PHONY: all clean
 
@@ -41,7 +41,10 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 	cat $< | ./remove-tags | ./decode $*.hmm-supervised.model > $@
 
 %.hmm-supervised.model: %.T.ptg %.H.ptg
-	./train-model-hmm $< --heldout $*.H.ptg $@
+	./train-model-hmm $< \
+		--heldout $*.H.ptg \
+		--lang $$(echo $* | cut -d. -f1) \
+		$@
 
 #########################################################
 # Unsupervised HMM experiment                           #
@@ -60,13 +63,15 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 	./train-model-hmm $< \
 		--unlabeled $*.T.unlabeled.ptg \
 		--heldout $*.H.ptg \
-		$@
+		--lang $$(echo $* | cut -d. -f1) \
+		$@ \
+		2> $@.log
 
 %.T.labeled.ptg: %.T.ptg
 	cat $< | head -n10000 > $@
 
 %.T.unlabeled.ptg: %.T.ptg
-	cat $< | tail -n+10001 | head -n 2000 | ./remove-tags > $@
+	cat $< | tail -n+10001 | ./remove-tags > $@
 
 #########################################################
 # Brill's tagger experiment                             #
@@ -283,4 +288,5 @@ clean:
 		*.exit-code \
 		*.results \
 		*.model \
+		*.log \
 		run_make.sh.*

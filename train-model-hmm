@@ -31,12 +31,18 @@ def parse_args():
             type=UnlabeledReader,
             default=None,
             )    
+    
+    parser.add_argument("--lang",
+            help="Language (this is used when filtering POS tags for unknown words)",
+            default="en",
+            choices=["cs", "cz", "en"],
+            )
 
     return parser.parse_args()
 
 def main():
     args = parse_args()
-    tagger = HMMTagger(n=3)
+    tagger = HMMTagger(n=3, language=args.lang)
     tagger.train_labeled(args.train)
     if args.unlabeled:
         tagger.train_unlabeled(args.unlabeled)
