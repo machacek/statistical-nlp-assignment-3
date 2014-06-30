@@ -1,11 +1,11 @@
 SHELL = /bin/bash
 
-BRILL_DIR = $(shell first_existing /home/mmachace/RULE_BASED_TAGGER_V1.14 /home/machacek/RULE_BASED_TAGGER_V1.14)
+BRILL_DIR = $(shell readlink -f RULE_BASED_TAGGER_V1.14)
 BRILL_TAGGER = $(BRILL_DIR)/Bin_and_Data/tagger
 
 TRAIN_SIZE = 20000000000
 
-.PHONY: all clean
+.PHONY: all clean RULE_BASED_TAGGER_V1.14
 
 .SECONDARY:
 
@@ -96,7 +96,7 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 #
 # Trenovani kontextualnich pravidel
 #
-%.context-rules: %.T.part2.spl %.T.part2.dummy-tagged %.T.part1.lexicon
+%.context-rules: %.T.part2.spl %.T.part2.dummy-tagged %.T.part1.lexicon RULE_BASED_TAGGER_V1.14
 	$(BRILL_DIR)/Bin_and_Data/contextual-rule-learn \
 		$*.T.part2.spl \
 		$*.T.part2.dummy-tagged \
@@ -104,7 +104,7 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 		$*.T.part1.lexicon ; \
 	echo "Exit code: $$? (contextual-rule-learn)" | tee $*.exit-code
 
-%.T.part2.dummy-tagged: %.T.part1.lexicon %.T.part2.untagged %.bigram-list %.unknown-word-rules %.word-list
+%.T.part2.dummy-tagged: %.T.part1.lexicon %.T.part2.untagged %.bigram-list %.unknown-word-rules %.word-list RULE_BASED_TAGGER_V1.14
 	export PATH=$(BRILL_DIR)/Bin_and_Data:$$PATH && \
 	tagger \
 		$*.T.part1.lexicon \
@@ -143,6 +143,12 @@ all: en.baseline.results cz.baseline.results en.hmm-supervised.results cz.hmm-su
 
 %.T.part2.spl: %.T.spl
 	cat $< | awk 'NR % 2 == 1' > $@
+
+#
+# Kompilace Brill's tagger
+#
+RULE_BASED_TAGGER_V1.14:
+	$(MAKE) -C $@
 
 #########################################################
 # Ostatni pomocne cile                                  #
