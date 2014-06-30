@@ -1,8 +1,0 @@
-fold                   accuracy       stdev
--------------------  ----------  ----------
-en.fold1.S.accuracy    0.943003
-en.fold2.S.accuracy    0.944223
-en.fold3.S.accuracy    0.939988
-en.fold4.S.accuracy    0.942166
-en.fold5.S.accuracy    0.941544
-mean                   0.942185  0.00141847
