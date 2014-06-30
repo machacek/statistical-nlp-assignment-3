@@ -43,6 +43,7 @@ main(argc, argv)
   char **tempargv;
   int tempargc;
 
+  /*
   if (access(START_PROG,X_OK) != 0 ||
       access(END_PROG,X_OK) != 0) {
   fprintf(stderr,"YOU MUST RUN THIS PROGRAM IN THE SAME DIRECTORY AS %s and %s\n",
@@ -51,6 +52,7 @@ main(argc, argv)
 	 END_PROG);
   exit(0);
 }
+*/
 
 
   SPLIT =0;

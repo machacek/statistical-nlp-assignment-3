@@ -54,7 +54,7 @@ main(argc, argv)
 
 	Registry SEENTAGGING,WORDS;
 	char            *atempstrptr;
-	char            line[5000];	/* input line buffer */
+	char            line[15000];	/* input line buffer */
 	char            space[500];
 	int             linenums,tagnums;
 	char            **word_corpus_array,**tag_corpus_array;

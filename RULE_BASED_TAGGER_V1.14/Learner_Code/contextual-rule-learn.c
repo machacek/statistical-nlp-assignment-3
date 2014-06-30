@@ -178,7 +178,7 @@ Darray errorlist,temperrorkey,temperrorval;
 Registry errorlistcount,SEENTAGGING,WORDS;
 
 FILE *correct_file, *guess_file, *error_list,*correct_out;
-char line[5000];  /* input line buffer */
+char line[15000];  /* input line buffer */
 char **split_ptr,**split_ptr2;
 
 char tempfile1[128],tempfile2[128];

@@ -44,24 +44,24 @@ T_TARGETS = final-state-tagger \
 EXECS = ${L_TARGETS} ${T_TARGETS}
 
 
-CFLAGS = -O -I. ${C_INCL}
+CFLAGS = -m32 -ggdb -Wall -O -I. ${C_INCL}
 
 ${FINAL} : ${EXECS}
 
 $(LIBDIR)/lex.o : $(SRCDIR)/lex.c
-	cc -c -o $@ $<
+	cc -m32 -ggdb -Wall -c -o $@ $<
 
 $(LIBDIR)/useful.o : $(SRCDIR)/useful.c
-	cc -c -o $@ $<
+	cc -m32 -ggdb -Wall -c -o $@ $<
 
 $(LIBDIR)/darray.o : $(SRCDIR)/darray.c
-	cc -c -o $@ $<
+	cc -m32 -ggdb -Wall -c -o $@ $<
 
 $(LIBDIR)/registry.o : $(SRCDIR)/registry.c
-	cc -c -o $@ $<
+	cc -m32 -ggdb -Wall -c -o $@ $<
 
 $(LIBDIR)/memory.o : $(SRCDIR)/memory.c
-	cc -c -o $@ $<
+	cc -m32 -ggdb -Wall -c -o $@ $<
 
 ${T_TARGETS} : ${OBJ} 
 	cc $(CFLAGS) ${OBJ} -o $(BINDIR)/$@ $(T_DIR)/$@.c
